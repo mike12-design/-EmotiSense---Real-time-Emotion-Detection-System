@@ -1,0 +1,97 @@
+# EmotiSense Configuration File
+
+
+
+# -*- coding: utf-8 -*-
+
+
+#backend/config.yaml
+# Video Capture Settings
+video:
+  camera_index: 0
+  frame_width: 640
+  frame_height: 360
+  fps: 30
+  frame_skip: 2  # Process every Nth frame
+
+# Face Detection Settings
+face_detection:
+  scale_factor: 1.1
+  min_neighbors: 3
+  min_size: [80, 80]
+  max_size: [300, 300]
+  smoothing_factor: 0.3  # For smooth face tracking
+
+# Eye Detection Settings
+eye_detection:
+  scale_factor: 1.1
+  min_neighbors: 3
+  min_size: [20, 20]
+
+# Emotion Detection Settings
+emotion:
+  # Detector selection: 'deepface', 'hsemotion', 'fer', 'ensemble', 'eye_fusion', 'decision_fusion', 'meta_learner'
+  # - 'deepface': Default DeepFace library (稳定可靠)
+  # - 'hsemotion': High-speed emotion recognition (模型有兼容问题)
+  # - 'fer': FER library (lightweight)
+  # - 'ensemble': Combine multiple models
+  # - 'eye_fusion': Fuse eye region model with global features (best for sadness detection)
+  # - 'decision_fusion': Decision-level fusion with weighted averaging (规则融合)
+  # - 'meta_learner': Stacking classifier with Logistic Regression (元学习器融合，需要训练)
+  detector_type: 'meta_learner'  # 使用元学习器融合模型
+
+  detection_interval: 3.0  # Seconds between emotion analysis
+  high_confidence_threshold: 95  # Percentage
+  anger_threshold: 50  # Special threshold for anger emotion
+  max_data_records: 1000  # Maximum emotion records to keep
+
+  # Decision Fusion Settings (决策级融合专用)
+  # k: 眼睛模型权重 (0.0-1.0)
+  #   - k=0.5: 两者权重相等 (推荐，平衡中性与悲伤识别)
+  #   - k=0.7: 眼睛占 70%, DeepFace 占 30% (适合识别悲伤微表情)
+  #   - k=0.9: 更加只相信眼睛 (适合识别假笑)
+  #   - 可通过日记闭环动态调整此参数
+  decision_fusion_k: 0.5
+
+  # Meta-Learner Settings (元学习器专用)
+  # use_meta_learner: 是否使用元学习器替代规则融合
+  #   - true: 使用训练好的 Logistic Regression 分类器进行数据驱动融合
+  #   - false: 使用手动加权平均规则融合
+  use_meta_learner: true  # 启用元学习器（需要先运行 train_meta_learner.py 训练模型）
+
+  # Custom eye model path (optional)
+  eye_model_path: 'models/eye_model_finetuned.pth'
+  sad_threshold: 30                     # sad 置信度阈值
+  # HSEmotion specific settings
+  # Available models: enet_b0_8_best_afew, enet_b0_8_best_vgaf, enet_b2_8, enet_b0_7, enet_b2_7
+  hsemotion_model: 'enet_b0_8_best_afew'
+
+  # FER specific settings
+  fer_use_mtcnn: false  # Use MTCNN for face detection in FER (slower but more accurate)
+
+  # Ensemble settings (when detector_type is 'ensemble')
+  ensemble_models:
+    - 'hsemotion'
+    # - 'fer'  # Uncomment to add FER to ensemble
+
+# Data Management
+data:
+  cleanup_interval: 30  # Seconds between data cleanup
+  log_file: "emotion_log.txt"
+  enable_logging: true
+
+
+
+# UI Settings
+ui:
+  window_name: "情绪检测"
+  window_mode: "normal"  # normal or fullscreen
+  font_scale: 0.7
+  font_thickness: 2
+  font_color: [255, 255, 255]  # White
+  font_outline_color: [0, 0, 0]  # Black
+  font_outline_thickness: 3
+  face_box_color: [255, 0, 0]  # Blue
+  eye_box_color: [0, 255, 0]  # Green
+  box_thickness: 2
+  
