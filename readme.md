@@ -128,36 +128,71 @@ EmotiSense/
          └─────────────────┘
 ```
 
-### 四大核心创新机制
+### 四大核心创新机制（代码实现对应）
 
 #### 1. 感知遮挡的自适应退避机制 (Occlusion-Aware Adaptive Fallback)
 
 **问题**: 眼部被头发、眼镜或手遮挡时，局部模型预测可能产生噪声。
 
-**解决方案**:
+**代码实现** (`eye_feature_extractor.py:extract_eye_region`):
 ```python
-# 伪代码示例
-if eye_occlusion_ratio > 0.5:
-    # 高遮挡：完全退避至全局模型
-    final_prediction = global_model_prediction
-else:
-    # 低遮挡：送入元学习器融合
-    final_prediction = meta_learner.predict(combined_features)
+# 🚨 失败了！触发 Debug 存图机制
+logger.debug("⚠️ 眼睛被遮挡（墨镜/低头），局部专家失效，拒绝瞎猜")
+
+# 保存失败样本到 debug 目录，方便后续分析
+debug_dir = Path(__file__).parent.parent.parent / "debug_no_eyes"
+os.makedirs(debug_dir, exist_ok=True)
+# ... 存图逻辑 ...
+
+# 核心修改：绝对不要硬裁剪！直接告诉上层"我看不见"
+return None
+```
+
+**上层处理** (`decision_fusion_detector.py:analyze_emotion`):
+```python
+# Step 3：获取眼睛概率 & 遮挡免疫机制
+P_eye = self._get_eye_sad_prob(frame_bgr, face_rect)
+
+# 🚨 戴了墨镜 / 闭眼 / 没找到眼睛 -> 局部专家"瞎了"，100% 听全局！
+if P_eye < 0:  # extract_eye_region 返回 None 时，_get_eye_sad_prob 返回 -1
+    return top_emotion, top_confidence  # 直接返回全局模型结果
 ```
 
 **技术要点**:
-- 基于 YOLOv8 关键点检测置信度评估遮挡程度
-- 动态调整融合权重，遮挡严重时自动降级为全局模型
-- 保证系统鲁棒性，避免局部特征误导整体决策
+- `extract_eye_region` 遇到遮挡直接返回 `None`，不进行硬裁剪（Blind Crop）
+- `_get_eye_sad_prob` 将 `None` 转换为 `-1`，作为遮挡标志位
+- 元学习器只在"眼睛清澈可见"的样本上出手
+- 当眼睛清晰可见时，元学习器纠正 HSEmotion 误判的能力极强
+
+**设计哲学**: 如果一个人戴着墨镜，眼睛专家就"瞎了"，这时候我们应该立刻剥夺眼睛专家的投票权，100% 信任全局模型（HSEmotion），因为全局模型还能看到嘴唇、面部肌肉和头部姿态。
 
 #### 2. 非对称置信度门控 (Asymmetric Confidence Gating)
 
 **问题**: 元分类器可能过度推翻基线模型在高置信度样本上的正确预测（"灾难性推翻"）。
 
-**解决方案**:
-- 当全局模型对某类别置信度 >95% 时，直接输出该类别，跳过元学习器
-- 仅在中低置信度区间（<80%）激活元学习器进行二次仲裁
-- 高置信度样本采用"直通模式"，保护基线模型的优势判断
+**代码实现** (`decision_fusion_detector.py:analyze_emotion`):
+```python
+# Step 2：高置信度直通与门控拦截
+if top_confidence >= 80.0:
+    return top_emotion, top_confidence  # 高置信度直接输出，跳过融合
+
+p_sad = all_emotions.get('sad', 0.0)
+p_neutral = all_emotions.get('neutral', 0.0)
+is_target_top = (top_emotion in self.FUSION_TARGET_EMOTIONS)
+
+# 非目标情绪 + 中高置信度 -> 不触发融合
+if not is_target_top:
+    if top_confidence > 55.0 or (p_sad < 25.0 and p_neutral < 25.0):
+        return top_emotion, top_confidence
+```
+
+**门控逻辑**:
+| 条件 | 置信度 | 情绪类型 | 行为 |
+|------|--------|----------|------|
+| `top_confidence >= 80%` | 高 | 任意 | 直通，不融合 |
+| `55% < confidence < 80%` | 中 | 非目标 (Happy/Angry 等) | 直通，不融合 |
+| `p_sad < 25% AND p_neutral < 25%` | 低 | 任意 | 直通（无融合必要）|
+| 其他 | 中低 | 目标 (Sad/Neutral) | 激活元学习器 |
 
 **效果**: 在 Happy 等高置信度类别上，召回率稳定在 0.94，融合不破坏基线优势。
 
@@ -165,9 +200,17 @@ else:
 
 **问题**: 传统阈值法（如 50%）会漏掉潜在情绪（如 26% 的悲伤信号可能是真悲伤）。
 
+**代码实现**:
+```python
+# 触发条件：sad 或 neutral 概率 >= 25%
+if not is_target_top:
+    if p_sad < 25.0 and p_neutral < 25.0:  # 双低则不触发
+        return top_emotion, top_confidence
+```
+
 **解决方案**:
-- 将触发边界扩展至 25%：任何情绪概率 >25% 即唤醒元学习器
-- 元学习器接收完整软概率分布，而非硬阈值判断
+- 将触发边界扩展至 25%：`sad >= 25%` 或 `neutral >= 25%` 即唤醒元学习器
+- 元学习器接收完整软概率分布（7 维全局 + 1 维眼部）
 - 增强对微弱情绪信号的敏感度
 
 **效果**: Neutral 召回率从 0.60 跃升至 0.66（+6%），精准纠正"面无表情"误判为悲伤。
@@ -176,34 +219,88 @@ else:
 
 **问题**: 规则融合（如 k=0.5 加权平均）无法捕捉复杂的类别间依赖关系。
 
-**解决方案**:
-- 使用 Random Forest / Logistic Regression 作为元分类器
-- 输入为基线模型的**软概率输出**（非硬标签）
-- 在 OAHEGA 验证集上重新训练元分类器，拟合新基座模型的决策边界
+**代码实现**:
+```python
+# Step 4：元学习器决策 (Meta-Learner)
+if self.use_meta_learner:
+    # 提取特征向量：[全局 7 类概率 + 眼部 sad 概率]
+    features = MetaLearnerPrediction.extract_features(all_emotions, P_eye)
+    meta_emotion, meta_conf = MetaLearnerPrediction.predict(self.meta_learner, features)
+
+    # 元学习器内部置信度门控
+    if meta_emotion == 'abstain':
+        return top_emotion, top_confidence  # 元分类器弃权
+    if meta_conf < 55.0:
+        return top_emotion, top_confidence  # 置信不足
+    if not is_target_top and meta_conf < 75.0:
+        return top_emotion, top_confidence  # 非目标情绪需更高置信
+
+    return meta_emotion, meta_conf  # 元学习器输出
+```
 
 **训练流程**:
-1. 用 HSEmotion 和眼部 CNN 在验证集上生成软概率
-2. 拼接为特征向量，训练元分类器
-3. 元分类器学习"何时相信全局"、"何时相信局部"的非线性规则
+1. 用 HSEmotion 在验证集上生成 7 维软概率
+2. 用眼部 CNN 生成眼部 sad 概率
+3. 拼接为 8 维特征向量，训练 Random Forest / Logistic Regression
+4. 元分类器学习"何时相信全局"、"何时相信局部"的非线性规则
 
 **效果**: 整体准确率从 71.94% 提升至 72.80%（+0.86%），Macro-F1 从 74.07% 提升至 74.73%（+0.66%）。
+
+### 融合决策流程（完整代码逻辑）
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  Step 1: 获取全局情绪分布 (HSEmotion 7 类概率)                  │
+└─────────────────────┬───────────────────────────────────────┘
+                      │
+         ┌────────────▼────────────┐
+         │  Step 2: 高置信度门控    │
+         │  if confidence >= 80%   │──── Yes ────→ 直通输出
+         │  if confidence > 55% &  │
+         │     not target emotion  │
+         └────────────┬────────────┘
+                      No
+         ┌────────────▼────────────┐
+         │  Step 3: 检测眼部特征    │
+         │  if P_eye < 0 (遮挡)     │──── Yes ────→ 退避至全局
+         └────────────┬────────────┘
+                      No
+         ┌────────────▼────────────┐
+         │  Step 4: 元学习器预测    │
+         │  features = [7 全局 +1 眼部] │
+         │  if meta_conf < 55%      │──── Yes ────→ 回退全局
+         │  if not target & < 75%   │
+         └────────────┬────────────┘
+                      No
+         ┌────────────▼────────────┐
+         │  Step 5: 规则融合 (备用)  │
+         │  var_final = k*P_eye +  │
+         │             (1-k)*P_global │
+         └─────────────────────────┘
+```
 
 ### 融合决策示例
 
 **场景 1: 识别"假笑"（表面快乐，真实悲伤）**
-- 全局模型：Happy 85%, Sad 10%
-- 眼部模型：Sad 75%
-- 元学习器输出：Sad 60%, Happy 35% ← 捕捉到眼部悲伤微表情
+- 全局模型：Happy 85% → **Step 2 直通输出** (置信度>80%，不触发融合)
+- 说明：高置信度的快乐情绪，元学习器不会强行推翻
 
 **场景 2: 识别"面无表情"（真中性，非悲伤）**
 - 全局模型：Neutral 70%, Sad 25%
-- 眼部模型：Neutral 80%
+- 眼部模型：Neutral 80% (P_eye_sad ≈ 0.2)
+- 触发条件：Sad=25% 达到触发边界 → 进入 Step 4
 - 元学习器输出：Neutral 82% ← 局部特征强化中性判断
 
-**场景 3: 遮挡场景（手遮住眼睛）**
+**场景 3: 识别"潜在悲伤"（微弱信号）**
+- 全局模型：Sad 26%, Neutral 60%
+- 触发条件：Sad=26% > 25% → 进入 Step 4
+- 眼部模型：Sad 70%
+- 元学习器输出：Sad 65% ← 捕捉到微弱悲伤信号
+
+**场景 4: 遮挡场景（手遮住眼睛）**
 - 全局模型：Angry 60%
-- 眼部模型：检测失败（遮挡）
-- 自适应退避：直接采用全局模型输出 Angry 60%
+- 眼部检测：P_eye = -1 (检测失败)
+- Step 3 判断：`if P_eye < 0` → 直接返回 Angry 60%
 
 ### 实验验证
 
@@ -263,10 +360,10 @@ Kovenko, Volodymyr; Shevchuk, Vitalii (2021), "OAHEGA : EMOTION RECOGNITION DATA
 
 ### 核心创新机制
 
-1. **感知遮挡的自适应退避机制** - 动态评估眼部局部特征有效性，高遮挡时自动退避至全局模型
-2. **非对称置信度门控** - 防止元分类器在优势类别上产生"灾难性推翻"
-3. **动态触发边界扩展** - 潜在概率 >25% 即唤醒元分类器进行二次仲裁
-4. **基于软概率的领域适应重塑** - 重新训练 Random Forest 元分类器拟合新基座模型决策边界
+1. **感知遮挡的自适应退避机制** - `P_eye < 0` 时直接返回全局模型结果，避免遮挡干扰
+2. **非对称置信度门控** - `confidence >= 80%` 直通，防止"灾难性推翻"
+3. **动态触发边界扩展** - `sad >= 25%` 或 `neutral >= 25%` 即触发融合仲裁
+4. **基于软概率的领域适应重塑** - Random Forest 元分类器学习非线性融合规则
 
 ### 细粒度情绪分析
 
@@ -433,36 +530,71 @@ This system employs a decision-level fusion architecture based on Stacking strat
          └─────────────────┘
 ```
 
-### Four Core Innovation Mechanisms
+### Four Core Innovation Mechanisms (Code Implementation)
 
 #### 1. Occlusion-Aware Adaptive Fallback
 
 **Problem**: When eyes are occluded by hair, glasses, or hands, local model predictions may introduce noise.
 
-**Solution**:
+**Code Implementation** (`eye_feature_extractor.py:extract_eye_region`):
 ```python
-# Pseudocode example
-if eye_occlusion_ratio > 0.5:
-    # High occlusion: fallback to global model only
-    final_prediction = global_model_prediction
-else:
-    # Low occlusion: send to meta-learner for fusion
-    final_prediction = meta_learner.predict(combined_features)
+# 🚨 Failed! Trigger debug image saving mechanism
+logger.debug("⚠️ Eyes occluded (sunglasses/head down), local expert ineffective, refusing to guess")
+
+# Save failed samples to debug directory for later analysis
+debug_dir = Path(__file__).parent.parent.parent / "debug_no_eyes"
+os.makedirs(debug_dir, exist_ok=True)
+# ... image saving logic ...
+
+# Core change: Never do hard crop! Directly tell upper layer "I can't see"
+return None
+```
+
+**Upper Layer Handling** (`decision_fusion_detector.py:analyze_emotion`):
+```python
+# Step 3: Get eye probability & occlusion immunity mechanism
+P_eye = self._get_eye_sad_prob(frame_bgr, face_rect)
+
+# 🚨 Sunglasses / closed eyes / no eyes detected -> local expert is "blind", 100% trust global!
+if P_eye < 0:  # When extract_eye_region returns None, _get_eye_sad_prob returns -1
+    return top_emotion, top_confidence  # Directly return global model result
 ```
 
 **Technical Details**:
-- Evaluate occlusion level based on YOLOv8 landmark detection confidence
-- Dynamically adjust fusion weights, automatically degrade to global model under severe occlusion
-- Ensure system robustness, prevent local features from misleading overall decision
+- `extract_eye_region` returns `None` when occlusion is detected, no blind crop
+- `_get_eye_sad_prob` converts `None` to `-1` as occlusion flag
+- Meta-learner only acts on samples with "clear visible eyes"
+- When eyes are clearly visible, meta-learner has strong ability to correct HSEmotion misjudgments
+
+**Design Philosophy**: If a person is wearing sunglasses, the eye expert is "blind". At this point, we should immediately strip the eye expert's voting rights and 100% trust the global model (HSEmotion), because the global model can still see lips, facial muscles, and head posture.
 
 #### 2. Asymmetric Confidence Gating
 
 **Problem**: Meta-classifier may overly override correct predictions from baseline model on high-confidence samples ("catastrophic overriding").
 
-**Solution**:
-- When global model confidence for a category >95%, directly output that category, bypass meta-learner
-- Activate meta-learner for secondary arbitration only in medium-low confidence range (<80%)
-- Use "direct pass mode" for high-confidence samples, protecting baseline model's advantageous judgments
+**Code Implementation** (`decision_fusion_detector.py:analyze_emotion`):
+```python
+# Step 2: High confidence direct pass & gating interception
+if top_confidence >= 80.0:
+    return top_emotion, top_confidence  # High confidence direct output, skip fusion
+
+p_sad = all_emotions.get('sad', 0.0)
+p_neutral = all_emotions.get('neutral', 0.0)
+is_target_top = (top_emotion in self.FUSION_TARGET_EMOTIONS)
+
+# Non-target emotion + medium-high confidence -> no fusion triggered
+if not is_target_top:
+    if top_confidence > 55.0 or (p_sad < 25.0 and p_neutral < 25.0):
+        return top_emotion, top_confidence
+```
+
+**Gating Logic**:
+| Condition | Confidence | Emotion Type | Behavior |
+|-----------|------------|--------------|----------|
+| `top_confidence >= 80%` | High | Any | Direct pass, no fusion |
+| `55% < confidence < 80%` | Medium | Non-target (Happy/Angry, etc.) | Direct pass, no fusion |
+| `p_sad < 25% AND p_neutral < 25%` | Low | Any | Direct pass (no fusion needed) |
+| Others | Medium-Low | Target (Sad/Neutral) | Activate meta-learner |
 
 **Effect**: On high-confidence categories like Happy, recall rate remains stable at 0.94, fusion does not destroy baseline advantages.
 
@@ -470,9 +602,17 @@ else:
 
 **Problem**: Traditional threshold methods (e.g., 50%) miss potential emotions (e.g., 26% sadness signal might be genuine sadness).
 
+**Code Implementation**:
+```python
+# Trigger condition: sad or neutral probability >= 25%
+if not is_target_top:
+    if p_sad < 25.0 and p_neutral < 25.0:  # Both low, no trigger
+        return top_emotion, top_confidence
+```
+
 **Solution**:
-- Extend trigger boundary to 25%: any emotion with probability >25% activates meta-learner
-- Meta-learner receives complete soft probability distribution, not hard threshold decisions
+- Extend trigger boundary to 25%: `sad >= 25%` or `neutral >= 25%` activates meta-learner
+- Meta-learner receives complete soft probability distribution (7D global + 1D eye)
 - Enhance sensitivity to weak emotional signals
 
 **Effect**: Neutral recall rate jumped from 0.60 to 0.66 (+6%), accurately correcting "expressionless" misclassified as sadness.
@@ -481,34 +621,88 @@ else:
 
 **Problem**: Rule-based fusion (e.g., k=0.5 weighted average) cannot capture complex inter-class dependencies.
 
-**Solution**:
-- Use Random Forest / Logistic Regression as meta-classifier
-- Input is **soft probability output** from baseline models (not hard labels)
-- Retrain meta-classifier on OAHEGA validation set to fit decision boundaries of new base models
+**Code Implementation**:
+```python
+# Step 4: Meta-Learner Decision
+if self.use_meta_learner:
+    # Extract feature vector: [global 7-class probs + eye sad prob]
+    features = MetaLearnerPrediction.extract_features(all_emotions, P_eye)
+    meta_emotion, meta_conf = MetaLearnerPrediction.predict(self.meta_learner, features)
+
+    # Meta-learner internal confidence gating
+    if meta_emotion == 'abstain':
+        return top_emotion, top_confidence  # Meta-classifier abstains
+    if meta_conf < 55.0:
+        return top_emotion, top_confidence  # Insufficient confidence
+    if not is_target_top and meta_conf < 75.0:
+        return top_emotion, top_confidence  # Non-target needs higher confidence
+
+    return meta_emotion, meta_conf  # Meta-learner output
+```
 
 **Training Pipeline**:
-1. Generate soft probabilities using HSEmotion and Eye CNN on validation set
-2. Concatenate as feature vectors, train meta-classifier
-3. Meta-classifier learns non-linear rules for "when to trust global" and "when to trust local"
+1. Generate 7D soft probabilities using HSEmotion on validation set
+2. Generate eye sad probability using Eye CNN
+3. Concatenate into 8D feature vector, train Random Forest / Logistic Regression
+4. Meta-classifier learns non-linear rules for "when to trust global" vs "when to trust local"
 
 **Effect**: Overall accuracy improved from 71.94% to 72.80% (+0.86%), Macro-F1 from 74.07% to 74.73% (+0.66%).
+
+### Fusion Decision Flow (Complete Code Logic)
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  Step 1: Get Global Emotion Distribution (HSEmotion 7-class) │
+└─────────────────────┬───────────────────────────────────────┘
+                      │
+         ┌────────────▼────────────┐
+         │  Step 2: High Conf Gate │
+         │  if confidence >= 80%   │──── Yes ────→ Direct Output
+         │  if confidence > 55% &  │
+         │     not target emotion  │
+         └────────────┬────────────┘
+                      No
+         ┌────────────▼────────────┐
+         │  Step 3: Detect Eye      │
+         │  if P_eye < 0 (occluded) │──── Yes ────→ Fallback to Global
+         └────────────┬────────────┘
+                      No
+         ┌────────────▼────────────┐
+         │  Step 4: Meta-Learner    │
+         │  features = [7 global +1 eye] │
+         │  if meta_conf < 55%      │──── Yes ────→ Fallback to Global
+         │  if not target & < 75%   │
+         └────────────┬────────────┘
+                      No
+         ┌────────────▼────────────┐
+         │  Step 5: Rule Fusion     │
+         │  var_final = k*P_eye +  │
+         │             (1-k)*P_global │
+         └─────────────────────────┘
+```
 
 ### Fusion Decision Examples
 
 **Scenario 1: Recognizing "Fake Smile" (surface happiness, underlying sadness)**
-- Global Model: Happy 85%, Sad 10%
-- Eye Model: Sad 75%
-- Meta-Learner Output: Sad 60%, Happy 35% ← Captures sad micro-expression in eyes
+- Global Model: Happy 85% → **Step 2 Direct Output** (confidence >80%, fusion not triggered)
+- Note: High-confidence happy emotion, meta-learner won't forcibly override
 
 **Scenario 2: Recognizing "Expressionless" (true neutral, not sadness)**
 - Global Model: Neutral 70%, Sad 25%
-- Eye Model: Neutral 80%
+- Eye Model: Neutral 80% (P_eye_sad ≈ 0.2)
+- Trigger Condition: Sad=25% reaches boundary → Enter Step 4
 - Meta-Learner Output: Neutral 82% ← Local features reinforce neutral judgment
 
-**Scenario 3: Occlusion Scenario (hand covering eyes)**
+**Scenario 3: Recognizing "Potential Sadness" (weak signal)**
+- Global Model: Sad 26%, Neutral 60%
+- Trigger Condition: Sad=26% > 25% → Enter Step 4
+- Eye Model: Sad 70%
+- Meta-Learner Output: Sad 65% ← Captures weak sadness signal
+
+**Scenario 4: Occlusion Scenario (hand covering eyes)**
 - Global Model: Angry 60%
-- Eye Model: Detection failed (occluded)
-- Adaptive Fallback: Directly adopt global model output Angry 60%
+- Eye Detection: P_eye = -1 (detection failed)
+- Step 3 Judgment: `if P_eye < 0` → Directly return Angry 60%
 
 ### Experimental Validation
 
