@@ -141,6 +141,52 @@ emotion:
 - 厌恶 (Disgust)
 - 中性 (Neutral)
 
+## 数据集
+
+### OAHEGA Emotion Recognition Dataset
+
+本项目使用的情绪识别数据集包含 6 种不同情绪类别：Happy、Angry、Sad、Neutral、Surprise 和 Ahegao。
+
+**数据集特点：**
+- 图像格式：RGB 人脸裁剪图像
+- 数据来源：Facebook、Instagram 社交网络爬取，YouTube 视频，以及 IMDB、AffectNet 等公开数据集
+- 数据组织：按情绪类别分文件夹存储，附带 `data.csv` 包含图像路径和标签
+
+**引用：**
+```
+Kovenko, Volodymyr; Shevchuk, Vitalii (2021), "OAHEGA : EMOTION RECOGNITION DATASET", Mendeley Data, V2, doi: 10.17632/5ck5zz6f2c.2
+```
+
+## 实验结果
+
+### 元学习器融合模型性能评估
+
+在 **8,539 个样本** 的大规模混合情绪数据集上进行的对比测试结果：
+
+**数据分布：** Angry (1306), Happy (2000), Neutral (2000), Sad (2000), Surprise (1233)
+
+| 模型架构 | 总体准确率 (Accuracy) | 宏平均 F1 (Macro-F1) |
+|----------|----------------------|---------------------|
+| DeepFace 单体 (经典基准) | 30.10% | 35.10% |
+| HSEmotion 单体 (SOTA 基线) | 71.94% | 74.07% |
+| **Meta-Learner Fusion (本文提出)** | **72.80%** (+0.86%) | **74.73%** (+0.66%) |
+
+### 核心创新机制
+
+1. **感知遮挡的自适应退避机制** - 动态评估眼部局部特征有效性，高遮挡时自动退避至全局模型
+2. **非对称置信度门控** - 防止元分类器在优势类别上产生"灾难性推翻"
+3. **动态触发边界扩展** - 潜在概率 >25% 即唤醒元分类器进行二次仲裁
+4. **基于软概率的领域适应重塑** - 重新训练 Random Forest 元分类器拟合新基座模型决策边界
+
+### 细粒度情绪分析
+
+| 情绪 | 突破点 |
+|------|--------|
+| **中性 (Neutral)** | 召回率从 0.60 跃升至 0.66（提升 6%），精准纠正"面无表情"误判为悲伤 |
+| **愤怒 (Angry)** | 精确率从 0.69 提升至 0.72，中性情绪精准识别带来溢出红利 |
+| **悲伤 (Sad)** | 精确率维持 0.87 极高水准，低误报保证干预决策可靠性 |
+| **快乐 (Happy)** | 召回率稳定在 0.94，非破坏性融合保留基线优势 |
+
 ## 项目特色
 
 1. **多模态融合**: 结合全局人脸和眼部区域特征，提升识别准确率
@@ -301,16 +347,59 @@ emotion:
 ## Emotion Categories
 
 The system supports the following 7 basic emotion recognition:
+- Happy
+- Sad
+- Angry
+- Fear
+- Surprise
+- Disgust
+- Neutral
 
-| English | 中文 |
-|------|---------|
-| Happy | 快乐 |
-| Sad | 悲伤 |
-| Angry | 愤怒 |
-| Fear | 恐惧 |
-| Surprise | 惊讶 |
-| Disgust | 厌恶 |
-| Neutral | 中性 |
+## Dataset
+
+### OAHEGA Emotion Recognition Dataset
+
+The emotion recognition dataset used in this project contains 6 distinct emotion categories: Happy, Angry, Sad, Neutral, Surprise, and Ahegao.
+
+**Dataset Features:**
+- Image Format: RGB cropped face images
+- Data Sources: Scraped from Facebook, Instagram, YouTube videos, and public datasets like IMDB and AffectNet
+- Organization: Images stored in folders by emotion category, with `data.csv` containing image paths and labels
+
+**Citation:**
+```
+Kovenko, Volodymyr; Shevchuk, Vitalii (2021), "OAHEGA : EMOTION RECOGNITION DATASET", Mendeley Data, V2, doi: 10.17632/5ck5zz6f2c.2
+```
+
+## Experimental Results
+
+### Meta-Learner Fusion Model Performance Evaluation
+
+Comparative testing results on a large-scale mixed emotion dataset with **8,539 samples**:
+
+**Data Distribution:** Angry (1306), Happy (2000), Neutral (2000), Sad (2000), Surprise (1233)
+
+| Model Architecture | Accuracy | Macro-F1 |
+|----------|----------|----------|
+| DeepFace Single Model (Classic Baseline) | 30.10% | 35.10% |
+| HSEmotion Single Model (SOTA Baseline) | 71.94% | 74.07% |
+| **Meta-Learner Fusion (Proposed)** | **72.80%** (+0.86%) | **74.73%** (+0.66%) |
+
+### Core Innovation Mechanisms
+
+1. **Occlusion-Aware Adaptive Fallback** - Dynamically evaluates local eye feature validity, automatically falls back to global model under high occlusion
+2. **Asymmetric Confidence Gating** - Prevents "catastrophic overriding" by meta-classifier on dominant categories
+3. **Dynamic Trigger Boundary** - Activates meta-classifier for secondary arbitration when potential probability >25%
+4. **Domain Adaptation via Soft Probabilities** - Retrains Random Forest meta-classifier to fit new base model decision boundaries
+
+### Fine-Grained Emotion Analysis
+
+| Emotion | Breakthrough |
+|---------|--------------|
+| **Neutral** | Recall increased from 0.60 to 0.66 (+6%), accurately correcting "expressionless" misclassified as sadness |
+| **Angry** | Precision improved from 0.69 to 0.72, spillover benefit from precise neutral recognition |
+| **Sad** | Precision maintained at 0.87, low false positive rate ensures reliable intervention decisions |
+| **Happy** | Recall stable at 0.94, non-destructive fusion preserves baseline advantages |
 
 ## Features Highlights
 
