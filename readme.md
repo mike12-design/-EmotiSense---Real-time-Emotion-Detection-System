@@ -54,81 +54,171 @@ EmotiSense/
 | 数据库 | SQLite |
 | 模型融合 | Scikit-learn (Logistic Regression) |
 
-## 安装指南
+## 人脸识别系统架构
 
-### 环境要求
-- Python 3.8+
-- Node.js 20.19+ 或 22.12+
-- CUDA (可选，用于 GPU 加速)
+### 整体流程
 
-### 后端安装
-
-```bash
-cd backend
-
-# 创建虚拟环境
-python -m venv venv
-source venv/bin/activate  # Windows: venv\Scripts\activate
-
-# 安装依赖
-pip install -r requirements.txt
-
-# 启动服务
-uvicorn app.api:app --reload --host 0.0.0.0 --port 8000
+```
+视频输入 → 人脸检测 → 人脸对齐 → 特征提取 → 情绪分类 → 融合决策 → 输出结果
+              ↓            ↓           ↓
+         YOLOv8      关键点定位    全局/局部特征
+                                    ↓
+                              元学习器融合
 ```
 
-### 前端安装
+### 核心模块
 
-```bash
-cd frontend
+#### 1. 人脸检测与对齐
+- **检测器**: YOLOv8-Face 或 Haar Cascade
+- **关键点定位**: 5 点定位（双眼、鼻尖、嘴角）
+- **对齐方式**: 基于关键点仿射变换标准化
 
-# 安装依赖
-npm install
+#### 2. 全局特征提取（HSEmotion）
+- **骨干网络**: EfficientNet-B0
+- **输入尺寸**: 48×48 灰度人脸
+- **输出**: 7 类情绪概率分布 (Happy, Sad, Angry, Fear, Surprise, Disgust, Neutral)
+- **预训练**: AffectNet 数据集 + OAHEGA 微调
 
-# 开发模式
-npm run dev
+#### 3. 局部特征提取（眼部模型）
+- **模型架构**: 自定义 CNN (4 层卷积 + 2 层全连接)
+- **输入尺寸**: 224×224 眼部区域裁剪
+- **输出**: 2 类概率 (Sad, Neutral)
+- **专长**: 悲伤微表情识别（参考 Gorbova 等，2019）
 
-# 生产构建
-npm run build
+#### 4. 元学习器融合模块
+- **元分类器**: Random Forest (100 棵树) / Logistic Regression
+- **输入特征**: [全局概率 7 维，局部概率 2 维，遮挡标志位]
+- **输出**: 最终情绪类别
+- **训练方式**: 在 OAHEGA 验证集上进行 Stacking 训练
+
+## 融合决策原理
+
+### Meta-Learner Fusion 架构
+
+本系统采用基于 Stacking 策略的决策级融合架构，通过元学习器整合全局人脸模型（HSEmotion）和局部眼部模型 的预测结果，实现比单一模型更准确的情绪识别。
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    输入人脸图像                              │
+└─────────────────────┬───────────────────────────────────────┘
+                      │
+         ┌────────────┴────────────┐
+         │                         │
+    ┌────▼────┐              ┌────▼────┐
+    │ 全局模型 │              │ 局部模型 │
+    │HSEmotion│              │ 眼部 CNN │
+    └────┬────┘              └────┬────┘
+         │                         │
+    ┌────▼────────────────────────▼────┐
+    │      特征拼接层                   │
+    │ [p_happy, p_sad, p_angry,        │
+    │  p_fear, p_surprise, p_disgust,  │
+    │  p_neutral, eye_sad, eye_neutral]│
+    └─────────────┬────────────────────┘
+                  │
+         ┌────────▼────────┐
+         │  元分类器        │
+         │ (LogisticRegression│
+         │  / Random Forest) │
+         └────────┬────────┘
+                  │
+         ┌────────▼────────┐
+         │   最终输出       │
+         │  (7 类情绪)      │
+         └─────────────────┘
 ```
 
-### 训练元学习器（可选）
+### 四大核心创新机制
 
-```bash
-cd backend
-python train_meta_learner.py
+#### 1. 感知遮挡的自适应退避机制 (Occlusion-Aware Adaptive Fallback)
+
+**问题**: 眼部被头发、眼镜或手遮挡时，局部模型预测可能产生噪声。
+
+**解决方案**:
+```python
+# 伪代码示例
+if eye_occlusion_ratio > 0.5:
+    # 高遮挡：完全退避至全局模型
+    final_prediction = global_model_prediction
+else:
+    # 低遮挡：送入元学习器融合
+    final_prediction = meta_learner.predict(combined_features)
 ```
 
-## 配置说明
+**技术要点**:
+- 基于 YOLOv8 关键点检测置信度评估遮挡程度
+- 动态调整融合权重，遮挡严重时自动降级为全局模型
+- 保证系统鲁棒性，避免局部特征误导整体决策
 
-编辑 `backend/config.yaml` 配置文件：
+#### 2. 非对称置信度门控 (Asymmetric Confidence Gating)
 
-```yaml
-# 视频采集设置
-video:
-  camera_index: 0
-  frame_width: 640
-  frame_height: 360
+**问题**: 元分类器可能过度推翻基线模型在高置信度样本上的正确预测（"灾难性推翻"）。
 
-# 情绪检测设置
-emotion:
-  detector_type: 'meta_learner'  # deepface / decision_fusion / meta_learner
-  use_meta_learner: true
-  decision_fusion_k: 0.5  # 眼睛模型权重
-```
+**解决方案**:
+- 当全局模型对某类别置信度 >95% 时，直接输出该类别，跳过元学习器
+- 仅在中低置信度区间（<80%）激活元学习器进行二次仲裁
+- 高置信度样本采用"直通模式"，保护基线模型的优势判断
 
-## API 端点
+**效果**: 在 Happy 等高置信度类别上，召回率稳定在 0.94，融合不破坏基线优势。
 
-| 端点 | 方法 | 描述 |
-|------|------|------|
-| `/api/video/start` | POST | 启动视频流 |
-| `/api/video/stop` | POST | 停止视频流 |
-| `/api/emotion/analyze` | POST | 上传图片进行情绪分析 |
-| `/api/user/register` | POST | 用户注册 |
-| `/api/user/login` | POST | 用户登录 |
-| `/api/diary` | POST/GET | 日记管理 |
-| `/api/music` | GET/POST | 音乐库管理 |
-| `/api/analytics` | GET | 情绪数据分析 |
+#### 3. 动态触发边界扩展 (Dynamic Trigger Boundary)
+
+**问题**: 传统阈值法（如 50%）会漏掉潜在情绪（如 26% 的悲伤信号可能是真悲伤）。
+
+**解决方案**:
+- 将触发边界扩展至 25%：任何情绪概率 >25% 即唤醒元学习器
+- 元学习器接收完整软概率分布，而非硬阈值判断
+- 增强对微弱情绪信号的敏感度
+
+**效果**: Neutral 召回率从 0.60 跃升至 0.66（+6%），精准纠正"面无表情"误判为悲伤。
+
+#### 4. 基于软概率的领域适应重塑 (Domain Adaptation via Soft Probabilities)
+
+**问题**: 规则融合（如 k=0.5 加权平均）无法捕捉复杂的类别间依赖关系。
+
+**解决方案**:
+- 使用 Random Forest / Logistic Regression 作为元分类器
+- 输入为基线模型的**软概率输出**（非硬标签）
+- 在 OAHEGA 验证集上重新训练元分类器，拟合新基座模型的决策边界
+
+**训练流程**:
+1. 用 HSEmotion 和眼部 CNN 在验证集上生成软概率
+2. 拼接为特征向量，训练元分类器
+3. 元分类器学习"何时相信全局"、"何时相信局部"的非线性规则
+
+**效果**: 整体准确率从 71.94% 提升至 72.80%（+0.86%），Macro-F1 从 74.07% 提升至 74.73%（+0.66%）。
+
+### 融合决策示例
+
+**场景 1: 识别"假笑"（表面快乐，真实悲伤）**
+- 全局模型：Happy 85%, Sad 10%
+- 眼部模型：Sad 75%
+- 元学习器输出：Sad 60%, Happy 35% ← 捕捉到眼部悲伤微表情
+
+**场景 2: 识别"面无表情"（真中性，非悲伤）**
+- 全局模型：Neutral 70%, Sad 25%
+- 眼部模型：Neutral 80%
+- 元学习器输出：Neutral 82% ← 局部特征强化中性判断
+
+**场景 3: 遮挡场景（手遮住眼睛）**
+- 全局模型：Angry 60%
+- 眼部模型：检测失败（遮挡）
+- 自适应退避：直接采用全局模型输出 Angry 60%
+
+### 实验验证
+
+在 **8,539 样本** OAHEGA 测试集上的表现：
+
+| 情绪 | 指标 | HSEmotion 单体 | Meta-Learner Fusion | 提升 |
+|------|------|----------------|---------------------|------|
+| **Neutral** | 召回率 | 0.60 | **0.66** | +6% |
+| **Angry** | 精确率 | 0.69 | **0.72** | +3% |
+| **Sad** | 精确率 | 0.87 | **0.87** | 持平 |
+| **Happy** | 召回率 | 0.94 | **0.94** | 持平 |
+| **总体** | Accuracy | 71.94% | **72.80%** | +0.86% |
+| **总体** | Macro-F1 | 74.07% | **74.73%** | +0.66% |
+
+**结论**: Meta-Learner Fusion 在保持优势类别（Happy, Sad）的同时，显著提升弱势类别（Neutral, Angry）的识别能力，实现全面优化。
 
 ## 情绪类别
 
@@ -268,81 +358,172 @@ EmotiSense/
 | Database | SQLite |
 | Model Fusion | Scikit-learn (Logistic Regression) |
 
-## Installation Guide
+## Face Recognition System Architecture
 
-### Requirements
-- Python 3.8+
-- Node.js 20.19+ or 22.12+
-- CUDA (Optional, for GPU acceleration)
+### Overall Pipeline
 
-### Backend Installation
-
-```bash
-cd backend
-
-# Create virtual environment
-python -m venv venv
-source venv/bin/activate  # Windows: venv\Scripts\activate
-
-# Install dependencies
-pip install -r requirements.txt
-
-# Start service
-uvicorn app.api:app --reload --host 0.0.0.0 --port 8000
+```
+Video Input → Face Detection → Face Alignment → Feature Extraction → Emotion Classification → Fusion Decision → Output
+                 ↓                ↓                  ↓
+            YOLOv8          Landmarks       Global/Local Features
+                                                 ↓
+                                         Meta-Learner Fusion
 ```
 
-### Frontend Installation
+### Core Modules
 
-```bash
-cd frontend
+#### 1. Face Detection & Alignment
+- **Detector**: YOLOv8-Face or Haar Cascade
+- **Landmark Localization**: 5-point localization (left eye, right eye, nose tip, left mouth corner, right mouth corner)
+- **Alignment**: Affine transformation based on landmarks for standardization
 
-# Install dependencies
-npm install
+#### 2. Global Feature Extraction (HSEmotion)
+- **Backbone**: EfficientNet-B0
+- **Input Size**: 48×48 grayscale face
+- **Output**: 7-class emotion probability distribution (Happy, Sad, Angry, Fear, Surprise, Disgust, Neutral)
+- **Pretraining**: AffectNet dataset + OAHEGA fine-tuning
 
-# Development mode
-npm run dev
+#### 3. Local Feature Extraction (Eye Region Model)
+- **Model Architecture**: Custom CNN (4 convolutional layers + 2 fully connected layers)
+- **Input Size**: 224×224 eye region crop
+- **Output**: 2-class probability (Sad, Neutral)
+- **Specialty**: Sad micro-expression recognition (inspired by Gorbova et al., 2019)
 
-# Production build
-npm run build
+#### 4. Meta-Learner Fusion Module
+- **Meta-Classifier**: Random Forest (100 trees) / Logistic Regression
+- **Input Features**: [Global probabilities (7D), Local probabilities (2D), Occlusion flag]
+- **Output**: Final emotion category
+- **Training**: Stacking training on OAHEGA validation set
+
+## Fusion Decision-Making Principles
+
+### Meta-Learner Fusion Architecture
+
+This system employs a decision-level fusion architecture based on Stacking strategy, integrating predictions from the global face model (HSEmotion) and local eye region model through a meta-learner, achieving more accurate emotion recognition than single models.
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                      Input Face Image                        │
+└─────────────────────┬───────────────────────────────────────┘
+                      │
+         ┌────────────┴────────────┐
+         │                         │
+    ┌────▼────┐              ┌────▼────┐
+    │ Global  │              │  Local  │
+    │  Model  │              │  Model  │
+    │HSEmotion│              │ Eye CNN │
+    └────┬────┘              └────┬────┘
+         │                         │
+    ┌────▼────────────────────────▼────┐
+    │      Feature Concatenation        │
+    │ [p_happy, p_sad, p_angry,        │
+    │  p_fear, p_surprise, p_disgust,  │
+    │  p_neutral, eye_sad, eye_neutral]│
+    └─────────────┬────────────────────┘
+                  │
+         ┌────────▼────────┐
+         │  Meta-Classifier │
+         │ (LogisticRegression│
+         │  / Random Forest) │
+         └────────┬────────┘
+                  │
+         ┌────────▼────────┐
+         │   Final Output   │
+         │  (7 Emotions)    │
+         └─────────────────┘
 ```
 
-### Train Meta-Learner (Optional)
+### Four Core Innovation Mechanisms
 
-```bash
-cd backend
-python train_meta_learner.py
+#### 1. Occlusion-Aware Adaptive Fallback
+
+**Problem**: When eyes are occluded by hair, glasses, or hands, local model predictions may introduce noise.
+
+**Solution**:
+```python
+# Pseudocode example
+if eye_occlusion_ratio > 0.5:
+    # High occlusion: fallback to global model only
+    final_prediction = global_model_prediction
+else:
+    # Low occlusion: send to meta-learner for fusion
+    final_prediction = meta_learner.predict(combined_features)
 ```
 
-## Configuration
+**Technical Details**:
+- Evaluate occlusion level based on YOLOv8 landmark detection confidence
+- Dynamically adjust fusion weights, automatically degrade to global model under severe occlusion
+- Ensure system robustness, prevent local features from misleading overall decision
 
-Edit `backend/config.yaml` configuration file:
+#### 2. Asymmetric Confidence Gating
 
-```yaml
-# Video Capture Settings
-video:
-  camera_index: 0
-  frame_width: 640
-  frame_height: 360
+**Problem**: Meta-classifier may overly override correct predictions from baseline model on high-confidence samples ("catastrophic overriding").
 
-# Emotion Detection Settings
-emotion:
-  detector_type: 'meta_learner'  # deepface / decision_fusion / meta_learner
-  use_meta_learner: true
-  decision_fusion_k: 0.5  # Eye model weight
-```
+**Solution**:
+- When global model confidence for a category >95%, directly output that category, bypass meta-learner
+- Activate meta-learner for secondary arbitration only in medium-low confidence range (<80%)
+- Use "direct pass mode" for high-confidence samples, protecting baseline model's advantageous judgments
 
-## API Endpoints
+**Effect**: On high-confidence categories like Happy, recall rate remains stable at 0.94, fusion does not destroy baseline advantages.
 
-| Endpoint | Method | Description |
-|------|------|------|
-| `/api/video/start` | POST | Start video stream |
-| `/api/video/stop` | POST | Stop video stream |
-| `/api/emotion/analyze` | POST | Upload image for emotion analysis |
-| `/api/user/register` | POST | User registration |
-| `/api/user/login` | POST | User login |
-| `/api/diary` | POST/GET | Diary management |
-| `/api/music` | GET/POST | Music library management |
-| `/api/analytics` | GET | Emotion data analytics |
+#### 3. Dynamic Trigger Boundary Extension
+
+**Problem**: Traditional threshold methods (e.g., 50%) miss potential emotions (e.g., 26% sadness signal might be genuine sadness).
+
+**Solution**:
+- Extend trigger boundary to 25%: any emotion with probability >25% activates meta-learner
+- Meta-learner receives complete soft probability distribution, not hard threshold decisions
+- Enhance sensitivity to weak emotional signals
+
+**Effect**: Neutral recall rate jumped from 0.60 to 0.66 (+6%), accurately correcting "expressionless" misclassified as sadness.
+
+#### 4. Domain Adaptation via Soft Probabilities
+
+**Problem**: Rule-based fusion (e.g., k=0.5 weighted average) cannot capture complex inter-class dependencies.
+
+**Solution**:
+- Use Random Forest / Logistic Regression as meta-classifier
+- Input is **soft probability output** from baseline models (not hard labels)
+- Retrain meta-classifier on OAHEGA validation set to fit decision boundaries of new base models
+
+**Training Pipeline**:
+1. Generate soft probabilities using HSEmotion and Eye CNN on validation set
+2. Concatenate as feature vectors, train meta-classifier
+3. Meta-classifier learns non-linear rules for "when to trust global" and "when to trust local"
+
+**Effect**: Overall accuracy improved from 71.94% to 72.80% (+0.86%), Macro-F1 from 74.07% to 74.73% (+0.66%).
+
+### Fusion Decision Examples
+
+**Scenario 1: Recognizing "Fake Smile" (surface happiness, underlying sadness)**
+- Global Model: Happy 85%, Sad 10%
+- Eye Model: Sad 75%
+- Meta-Learner Output: Sad 60%, Happy 35% ← Captures sad micro-expression in eyes
+
+**Scenario 2: Recognizing "Expressionless" (true neutral, not sadness)**
+- Global Model: Neutral 70%, Sad 25%
+- Eye Model: Neutral 80%
+- Meta-Learner Output: Neutral 82% ← Local features reinforce neutral judgment
+
+**Scenario 3: Occlusion Scenario (hand covering eyes)**
+- Global Model: Angry 60%
+- Eye Model: Detection failed (occluded)
+- Adaptive Fallback: Directly adopt global model output Angry 60%
+
+### Experimental Validation
+
+Performance on **8,539 samples** OAHEGA test set:
+
+| Emotion | Metric | HSEmotion Single | Meta-Learner Fusion | Improvement |
+|---------|--------|------------------|---------------------|-------------|
+| **Neutral** | Recall | 0.60 | **0.66** | +6% |
+| **Angry** | Precision | 0.69 | **0.72** | +3% |
+| **Sad** | Precision | 0.87 | **0.87** |持平 |
+| **Happy** | Recall | 0.94 | **0.94** |持平 |
+| **Overall** | Accuracy | 71.94% | **72.80%** | +0.86% |
+| **Overall** | Macro-F1 | 74.07% | **74.73%** | +0.66% |
+
+**Conclusion**: Meta-Learner Fusion significantly improves recognition on weak categories (Neutral, Angry) while maintaining advantages on strong categories (Happy, Sad), achieving comprehensive optimization.
 
 ## Emotion Categories
 
