@@ -36,9 +36,152 @@ EmotiSense/
 - Diary closed-loop feedback system.
 
 ### Intervention System
-- **Music Playback**: Automatically plays corresponding music based on emotional state.
-- **Voice Comfort**: Plays preset comfort scripts.
-- **Kinetic Model**: Intervention decision algorithm based on emotional changes.
+- **Music Playback**: Automatically plays corresponding music based on emotional state. Supports multi-file random play, user-exclusive music priority, and dynamic volume management.
+- **Voice Comfort**: Plays preset comfort scripts using Edge TTS (zh-CN-XiaoxiaoNeural) with automatic background music ducking.
+- **Kinetic Model**: Intervention decision algorithm based on emotional valence changes and fluctuation patterns.
+
+---
+
+### Music Intervention System
+
+#### Architecture
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  检测到情绪 (如 Sad, Happy, Neutral)                          │
+└─────────────────────┬───────────────────────────────────────┘
+                      │
+         ┌────────────▼────────────┐
+         │  音乐库检索             │
+         │  (优先级：专属 > 全局)   │
+         └────────────┬────────────┘
+                      │
+         ┌────────────▼────────────┐
+         │  随机抽取               │
+         │  (从 N 首文件中随机选 1 首) │
+         └────────────┬────────────┘
+                      │
+         ┌────────────▼────────────┐
+         │  Pygame Mixer 播放      │
+         │  (循环：-1, 音量管理)     │
+         └─────────────────────────┘
+```
+
+#### Core Features
+
+| Feature | Description |
+|---------|-------------|
+| **Multi-File Random Play** | Each emotion tag can be associated with multiple music files; one is randomly selected each time to avoid repetition fatigue. |
+| **Priority System** | When a logged-in user is recognized, the system first queries their exclusive music library; if empty, it falls back to the global library. |
+| **Dynamic Volume Management** | During TTS voice comfort, background music volume is automatically reduced to 10%-20%; after voice playback ends, volume smoothly restores to 100%. |
+| **Seamless Switching** | If the emotion state remains unchanged and music is playing, playback continues without interruption to avoid abrupt cuts. |
+| **File Format Support** | Supports MP3, WAV, OGG and other audio formats via Pygame mixer. |
+
+#### Database Schema
+
+```sql
+MusicLibrary:
+  - id: Integer (Primary Key)
+  - title: String (Original filename)
+  - filepath: String (Relative path, e.g., assets/music/sad_001.mp3)
+  - emotion_tag: String (e.g., 'sad', 'happy', 'calm')
+  - user_id: Integer (FK -> User.id, NULL = Global resource)
+  - is_active: Boolean (Default: True)
+```
+
+#### API Endpoints
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/user/upload_music` | POST | User uploads exclusive music (emotion-tagged). |
+| `/api/user/music` | GET | Retrieve user's exclusive music library. |
+| `/api/user/music/{id}` | DELETE | Delete user-uploaded music. |
+| `/api/admin/music` | GET | Retrieve global music library (admin). |
+| `/api/admin/upload_music` | POST | Admin uploads global music. |
+| `/api/admin/music/{id}` | DELETE | Admin deletes global music. |
+
+#### Technical Implementation
+
+- **Pygame Mixer**: Used for background music playback with loop support.
+- **Edge TTS**: Microsoft's cloud-based Text-to-Speech service (zh-CN-XiaoxiaoNeural) for voice comfort generation.
+- **Async Coordination**: Background music pauses during TTS playback via `asyncio.sleep()` and volume ducking.
+
+---
+
+### Emotion Dynamics Model
+
+#### Architecture
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  Real-time Emotion Input (emotion, confidence)              │
+└─────────────────────┬───────────────────────────────────────┘
+                      │
+         ┌────────────▼────────────┐
+         │  Valence Map            │
+         │  (-1.0 ~ 1.0)           │
+         └────────────┬────────────┘
+                      │
+         ┌────────────▼─────────────────────────┐
+         │  EMA Smoothing + Distress Accumulation│
+         │  α=0.2, decay=0.95                   │
+         └────────────┬─────────────────────────┘
+                      │
+         ┌────────────▼────────────┐
+         │  Intervention Trigger   │
+         │  distress > 1.2 + 60s cooldown │
+         └────────────┬────────────┘
+                      │
+         ┌────────────▼────────────┐
+         │  Trigger Voice/Music    │
+         └─────────────────────────┘
+```
+
+#### Core Parameters
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| **ALPHA** | 0.2 | EMA smoothing coefficient, controls emotion response speed |
+| **DECAY** | 0.95 | Stress decay coefficient, simulates natural emotional recovery |
+| **TRIGGER_THRESHOLD** | 1.2 | Intervention trigger threshold |
+| **COOLDOWN** | 60s | Intervention cooldown period, prevents excessive打扰 |
+
+#### Valence Map
+
+| Emotion | Valence Value | Psychological Interpretation |
+|---------|---------------|------------------------------|
+| Happy | +1.0 | High positive valence |
+| Surprise | +0.3 | Slight positive valence |
+| Neutral | 0.0 | Neutral |
+| Sad | -0.6 | Moderate negative valence |
+| Fear | -0.8 | High negative valence |
+| Angry | -1.0 | Extreme negative valence |
+| Disgust | -0.9 | High negative valence |
+| Contempt | -0.7 | Moderate-high negative valence |
+
+#### Intervention Trigger Logic
+
+```python
+# Stress accumulation: accumulates during negative valence, decays during positive
+if valence_ema < 0:
+    distress = distress * 0.95 + abs(valence_ema)
+else:
+    distress *= 0.95
+
+# Trigger condition: distress exceeds threshold + cooldown period elapsed
+if time_since_last_intervention > 60s and distress > 1.2:
+    trigger_intervention = True
+    distress *= 0.5  # Stress halved after intervention
+```
+
+#### Technical Features
+
+- **EMA Smoothing**: Avoids misjudgment due to single-frame emotion fluctuations
+- **Stress Accumulation Model**: Simulates real emotional stress persistence and decay characteristics
+- **Cooldown Mechanism**: Prevents excessively frequent interventions, reduces user disturbance
+- **Adaptive Intervention**: Dynamically triggers based on valence changes and fluctuation patterns
+
+---
 
 ### Data Management
 - SQLite database storage.
@@ -339,24 +482,46 @@ EmotiSense/
 - 日记闭环反馈系统
 
 ### 干预系统
-- **音乐播放**: 根据情绪状态自动播放对应类型的音乐
-- **语音安慰**: 播放预设的安慰话术
-- **动力学模型**: 基于情绪变化的干预决策算法
+- **音乐播放**: 根据情绪状态自动播放对应音乐，支持多文件随机播放、专属音乐优先、动态音量管理。
+- **语音安慰**: 使用 Edge TTS (zh-CN-XiaoxiaoNeural) 播放预设安慰话术，自动压低背景音乐。
+- **动力学模型**: 基于情绪价态变化和波动模式的干预决策算法。
 
-### 数据管理
-- SQLite 数据库存储
-- 情绪日志、系统事件、音乐库、安慰话术管理
-- 数据可视化分析
+---
 
-## 技术栈
+### 音乐干预系统
 
-| 模块 | 技术 |
+#### 系统架构
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  检测到情绪 (如 Sad, Happy, Neutral)                          │
+└─────────────────────┬───────────────────────────────────────┘
+                      │
+         ┌────────────▼────────────┐
+         │  音乐库检索             │
+         │  (优先级：专属 > 全局)   │
+         └────────────┬────────────┘
+                      │
+         ┌────────────▼────────────┐
+         │  随机抽取               │
+         │  (从 N 首文件中随机选 1 首) │
+         └────────────┬────────────┘
+                      │
+         ┌────────────▼────────────┐
+         │  Pygame Mixer 播放      │
+         │  (循环：-1, 音量管理)     │
+         └─────────────────────────┘
+```
+
+#### 核心功能
+
+| 功能 | 说明 |
 |------|------|
-| 后端 | Python, FastAPI, OpenCV, SQLAlchemy |
-| 前端 | Vue 3, Element Plus, ECharts, Axios |
-| 深度学习 | PyTorch, DeepFace, YOLOv8, HSEmotion |
-| 数据库 | SQLite |
-| 模型融合 | Scikit-learn (Random Forest) |
+| **多文件随机播放** | 每个情绪标签可关联多首音乐文件，每次随机抽取一首播放，避免重复疲劳。 |
+| **优先级系统** | 当识别到已登录用户时，优先检索其专属音乐库；若为空则回退至全局音乐库。 |
+| **动态音量管理** | TTS 语音安慰时自动将背景音乐音量降至 10%-20%；语音播放结束后平滑恢复至 100%。 |
+| **无缝切换** | 若情绪状态未变化且音乐正在播放，则不中断当前播放，避免突兀切断。 |
+| **文件格式支持** | 通过 Pygame mixer 支持 MP3、WAV、OGG 等音频格式。 |
 
 ## 人脸识别系统架构
 
