@@ -1,70 +1,73 @@
 <template>
-  <div class="mt-6">
-    <!-- 头部：标题与操作栏 -->
-    <div class="header-section mb-6">
-      <h2 class="text-xl font-semibold text-gray-800">
-        我的日记 ({{ filteredDiaries.length }} 条)
-      </h2>
-      
-      <!-- 搜索与筛选区 -->
-      <div class="filter-bar flex gap-2 mt-2">
-        <el-input 
-          v-model="searchKeyword" 
-          placeholder="搜索日记内容..." 
+  <div class="user-diary">
+    <!-- 1. 日记管理卡片 -->
+    <el-card class="mb-6 shadow-sm" style="border-radius: 16px;">
+      <template #header>
+        <div class="flex justify-between items-center">
+          <div class="flex items-center gap-2">
+            <el-icon color="#4f46e5"><Edit /></el-icon>
+            <span class="text-lg font-bold">我的日记 ({{ filteredDiaries.length }} 条)</span>
+          </div>
+          <div class="flex gap-2">
+            <el-button type="success" plain :icon="Calendar" @click="openDialog('patch')">补打卡</el-button>
+            <el-button type="primary" :icon="Plus" @click="openDialog('create')">新日记</el-button>
+          </div>
+        </div>
+      </template>
+
+      <!-- 搜索与筛选 -->
+      <div class="filter-bar flex gap-2 mb-4">
+        <el-input
+          v-model="searchKeyword"
+          placeholder="搜索日记内容..."
           :prefix-icon="Search"
           clearable
-          style="width: 200px"
+          style="width: 220px"
         />
         <el-date-picker
           v-model="searchDate"
           type="date"
           placeholder="按日期筛选"
           value-format="YYYY-MM-DD"
-          style="width: 150px"
+          style="width: 160px"
         />
       </div>
 
-      <!-- 操作按钮 -->
-      <div class="action-btns flex space-x-2 mt-2">
-        <el-button type="success" plain :icon="Calendar" @click="openDialog('patch')">补打卡</el-button>
-        <el-button type="primary" :icon="Plus" @click="openDialog('create')">新日记</el-button>
-      </div>
-    </div>
+      <!-- 列表区 -->
+      <div v-loading="loading">
+        <!-- 空状态 -->
+        <div v-if="filteredDiaries.length === 0" class="empty-state">
+          <p class="text-gray-500 mb-4">没有找到相关日记</p>
+          <el-button type="primary" @click="openDialog('create')">写一篇</el-button>
+        </div>
 
-    <!-- 列表区 -->
-    <div v-loading="loading">
-      <!-- 空状态 -->
-      <div v-if="filteredDiaries.length === 0" class="bg-white rounded-lg shadow-md p-8 text-center border-dashed border-2 border-gray-200">
-        <p class="text-gray-500 mb-4">没有找到相关日记</p>
-        <el-button type="primary" @click="openDialog('create')">写一篇</el-button>
-      </div>
-
-      <!-- 日记卡片列表 -->
-      <div v-else class="grid gap-4">
-        <el-card v-for="item in filteredDiaries" :key="item.id" shadow="hover" class="diary-card">
-          <div class="flex justify-between items-start">
-            <div class="flex-1">
-              <div class="flex items-center gap-2 mb-2">
-                 <el-tag :type="getEmotionTag(item.emotion)" size="small" effect="dark">{{ item.emotion }}</el-tag>
-                 <span class="text-gray-400 text-sm">{{ formatDate(item.timestamp) }}</span>
+        <!-- 日记卡片列表 -->
+        <div v-else class="grid gap-4">
+          <el-card v-for="item in filteredDiaries" :key="item.id" shadow="hover" class="diary-card">
+            <div class="flex justify-between items-start">
+              <div class="flex-1">
+                <div class="flex items-center gap-2 mb-2">
+                  <el-tag :type="getEmotionTag(item.emotion)" size="small" effect="dark">{{ item.emotion }}</el-tag>
+                  <span class="text-gray-400 text-sm">{{ formatDate(item.timestamp) }}</span>
+                </div>
+                <div class="text-gray-800 font-medium whitespace-pre-wrap">{{ item.content }}</div>
               </div>
-              <div class="text-gray-800 font-medium whitespace-pre-wrap">{{ item.content }}</div>
+
+              <!-- 修改与删除操作图标 -->
+              <div class="flex flex-col gap-2 ml-4">
+                <el-button type="primary" link :icon="Edit" @click="handleEdit(item)"></el-button>
+                <el-button type="danger" link :icon="Delete" @click="handleDelete(item.id)"></el-button>
+              </div>
             </div>
-            
-            <!-- 修改与删除操作图标 -->
-            <div class="flex flex-col gap-2 ml-4">
-              <el-button type="primary" link :icon="Edit" @click="handleEdit(item)"></el-button>
-              <el-button type="danger" link :icon="Delete" @click="handleDelete(item.id)"></el-button>
-            </div>
-          </div>
-        </el-card>
+          </el-card>
+        </div>
       </div>
-    </div>
+    </el-card>
 
     <!-- 写日记/编辑日记 弹窗 -->
-    <el-dialog 
-      v-model="showDialog" 
-      :title="dialogTitle" 
+    <el-dialog
+      v-model="showDialog"
+      :title="dialogTitle"
       width="500px"
       @close="resetForm"
     >
@@ -76,7 +79,7 @@
             type="datetime"
             placeholder="选择时间"
             style="width: 100%"
-            :disabled="mode === 'create'" 
+            :disabled="mode === 'create'"
           />
           <span v-if="mode === 'create'" class="text-xs text-gray-400">默认为当前时间</span>
         </el-form-item>
@@ -89,7 +92,7 @@
             placeholder="写下你现在的感受..."
           />
         </el-form-item>
-        
+
         <el-form-item label="心情状态">
           <el-radio-group v-model="form.emotion">
             <el-radio-button label="Happy">😊 开心</el-radio-button>
@@ -265,19 +268,28 @@ onMounted(fetchDiaries);
 </script>
 
 <style scoped>
-.header-section {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: space-between;
-  align-items: center;
+.user-diary {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 0 16px;
 }
+
+.empty-state {
+  text-align: center;
+  padding: 48px 16px;
+  border: 2px dashed #e5e7eb;
+  border-radius: 12px;
+}
+
 .diary-card {
   border-left: 5px solid #4f46e5;
   transition: transform 0.2s;
+  border-radius: 12px;
 }
 .diary-card:hover {
   transform: translateY(-2px);
 }
+
 /* 简单的 Flex 工具类 */
 .flex { display: flex; }
 .flex-col { flex-direction: column; }
@@ -288,6 +300,8 @@ onMounted(fetchDiaries);
 .gap-2 { gap: 0.5rem; }
 .gap-4 { gap: 1rem; }
 .mb-2 { margin-bottom: 0.5rem; }
+.mb-4 { margin-bottom: 1rem; }
+.mb-6 { margin-bottom: 1.5rem; }
 .ml-4 { margin-left: 1rem; }
 .grid { display: grid; }
 .whitespace-pre-wrap { white-space: pre-wrap; }
