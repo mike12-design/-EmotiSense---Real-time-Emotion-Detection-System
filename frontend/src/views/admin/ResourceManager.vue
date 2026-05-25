@@ -142,12 +142,23 @@
                   </template>
                 </el-table-column>
 
-                <el-table-column label="操作" align="center" width="120">
+                <el-table-column label="操作" align="center" width="160">
                   <template #default="scope">
+                    <el-button
+                      :type="playingMusicId === scope.row.id ? 'warning' : 'primary'"
+                      link
+                      @click="handlePlayMusic(scope.row)"
+                    >
+                      <el-icon :size="18">
+                        <VideoPause v-if="playingMusicId === scope.row.id" />
+                        <VideoPlay v-else />
+                      </el-icon>
+                    </el-button>
                     <el-button type="danger" link icon="Delete" @click="deleteMusic(scope.row.id)">删除</el-button>
                   </template>
                 </el-table-column>
               </el-table>
+              <audio ref="audioRef" @ended="playingMusicId = null" style="display:none" />
             </el-tab-pane>
 
           </el-tabs>
@@ -224,7 +235,7 @@
 import { ref, onMounted, computed } from 'vue'
 import axios from 'axios'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Menu, Setting, Picture, Upload, Plus, Delete, Headset } from '@element-plus/icons-vue'
+import { Menu, Setting, Picture, Upload, Plus, Delete, Headset, VideoPlay, VideoPause } from '@element-plus/icons-vue'
 
 const API_BASE = "http://127.0.0.1:8000"
 
@@ -244,6 +255,8 @@ const musicList = ref([])
 const musicDialogVisible = ref(false)
 const musicForm = ref({ emotion_tag: 'happy', file: null })
 const musicUploadRef = ref(null)
+const audioRef = ref(null)
+const playingMusicId = ref(null)
 
 const targetIdentifier = computed(() => {
   return currentUser.value?.isGlobal ? 'global' : currentUser.value?.username
@@ -397,6 +410,21 @@ const deleteMusic = async (id) => {
       ElMessage.error('删除失败')
     }
   }).catch(() => {})
+}
+
+const handlePlayMusic = (row) => {
+  const audio = audioRef.value
+  if (!audio) return
+
+  if (playingMusicId.value === row.id) {
+    audio.pause()
+    playingMusicId.value = null
+    return
+  }
+
+  audio.src = `${API_BASE}/${row.filepath}`
+  audio.play().catch(() => ElMessage.error('播放失败'))
+  playingMusicId.value = row.id
 }
 
 // 背景相关代码
