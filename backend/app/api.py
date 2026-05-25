@@ -1946,12 +1946,10 @@ async def get_system_health(user_id: int = None, month: Optional[str] = None, db
     """
     获取 AI 系统健康度数据（支持按用户筛选）
 
-    - 置信度分布
     - 情绪类别占比
     """
     cutoff, end_time = resolve_time_window(days=1, month=month)
 
-    # 获取指定时间窗口内的情绪记录
     query = db.query(EmotionLog).filter(
         EmotionLog.timestamp >= cutoff,
         EmotionLog.timestamp <= end_time
@@ -1960,39 +1958,13 @@ async def get_system_health(user_id: int = None, month: Optional[str] = None, db
         query = query.filter(EmotionLog.user_id == user_id)
     logs = query.all()
 
-    # 置信度分布统计
-    confidence_buckets = [0, 0, 0, 0, 0]  # 0-0.2, 0.2-0.4, 0.4-0.6, 0.6-0.8, 0.8-1.0
     emotion_counts = {}
 
     for log in logs:
-        # 置信度分布
-        score = log.score  # 0-1
-        if score < 0.2:
-            confidence_buckets[0] += 1
-        elif score < 0.4:
-            confidence_buckets[1] += 1
-        elif score < 0.6:
-            confidence_buckets[2] += 1
-        elif score < 0.8:
-            confidence_buckets[3] += 1
-        else:
-            confidence_buckets[4] += 1
-
-        # 情绪统计
         emotion_counts[log.emotion] = emotion_counts.get(log.emotion, 0) + 1
 
-    # 计算模型准确率（基于稳定检测的比例）
-    total_users = db.query(User).filter(User.role != "admin").count()
-    active_users = db.query(EmotionLog.user_id).filter(
-        EmotionLog.timestamp >= cutoff
-    ).distinct().count()
-
-    model_accuracy = active_users / max(total_users, 1) if total_users > 0 else 0
-
     return {
-        "confidenceDistribution": confidence_buckets,
         "emotionPieData": [{"name": k, "value": v} for k, v in emotion_counts.items()],
-        "modelAccuracy": round(model_accuracy, 2),
         "totalRecords": len(logs)
     }
 

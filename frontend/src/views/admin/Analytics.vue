@@ -66,19 +66,15 @@ const trajectoryData = ref({
 
 // 模块 5：AI 系统健康度
 const systemHealth = ref({
-  confidenceDistribution: [],
-  emotionPieData: [],
-  modelAccuracy: 0
+  emotionPieData: []
 });
 
 // DOM 引用
 const trajectoryChartRef = ref(null);
-const confidenceChartRef = ref(null);
 const emotionPieChartRef = ref(null);
 
 // 图表实例缓存
 let trajectoryChart = null;
-let confidenceChart = null;
 let emotionPieChart = null;
 let isUnmounted = false;
 let resizeTimer = null;
@@ -173,8 +169,7 @@ const fetchSystemHealth = async () => {
   try {
     const res = await axios.get(`${API_BASE}/admin/analytics/system-health`);
     systemHealth.value = res.data;
-    renderConfidenceChart();
-    renderAiHealthEmotionPieChart(systemHealth.value.emotionPieData || []);
+    renderEmotionPieChart(systemHealth.value.emotionPieData || []);
   } catch (e) {
     console.error('系统健康度加载失败:', e);
   }
@@ -298,48 +293,13 @@ const renderTrajectoryChart = () => {
 };
 
 
-// ============ 模块 5：AI 健康度图表 ============
-const renderConfidenceChart = () => {
-  if (!confidenceChartRef.value) return;
-  if (!confidenceChart) confidenceChart = echarts.init(confidenceChartRef.value);
-
-  const distribution = systemHealth.value.confidenceDistribution || [];
-
-  confidenceChart.setOption({
-    title: {
-      text: '识别置信度分布',
-      left: 'center',
-      textStyle: { fontSize: 14 }
-    },
-    xAxis: {
-      type: 'category',
-      data: ['0-0.2', '0.2-0.4', '0.4-0.6', '0.6-0.8', '0.8-1.0'],
-      name: '置信度区间'
-    },
-    yAxis: {
-      type: 'value',
-      name: '次数'
-    },
-    series: [{
-      type: 'bar',
-      data: distribution,
-      itemStyle: {
-        color: (params) => {
-          const colors = ['#f56c6c', '#e6a23c', '#909399', '#409eff', '#67c23a'];
-          return colors[params.dataIndex];
-        }
-      }
-    }]
-  });
-};
-
-const renderAiHealthEmotionPieChart = (pieData) => {
+// ============ 模块 5：情绪类别占比 ============
+const renderEmotionPieChart = (pieData) => {
   if (!emotionPieChartRef.value) return;
   if (!emotionPieChart) emotionPieChart = echarts.init(emotionPieChartRef.value);
 
   const colors = ['#ff6b6b', '#feca57', '#48dbfb', '#1dd1a1', '#5f27cd', '#ff9ff3', '#c8d6e5'];
   emotionPieChart.setOption({
-    title: { text: '情绪类别占比', left: 'center', textStyle: { fontSize: 14 } },
     tooltip: { trigger: 'item', formatter: '{b}: {c} ({d}%)' },
     legend: { orient: 'vertical', left: 'left', top: 'middle' },
     color: colors,
@@ -357,7 +317,6 @@ const handleResize = () => {
   if (resizeTimer) clearTimeout(resizeTimer);
   resizeTimer = setTimeout(() => {
     if (trajectoryChart && typeof trajectoryChart.resize === 'function') trajectoryChart.resize();
-    if (confidenceChart && typeof confidenceChart.resize === 'function') confidenceChart.resize();
     if (emotionPieChart && typeof emotionPieChart.resize === 'function') emotionPieChart.resize();
   }, 100);
 };
@@ -366,11 +325,9 @@ const handleResize = () => {
 const handleUserSelect = (userId) => {
   // 清理旧图表
   if (trajectoryChart && typeof trajectoryChart.dispose === 'function') trajectoryChart.dispose();
-  if (confidenceChart && typeof confidenceChart.dispose === 'function') confidenceChart.dispose();
   if (emotionPieChart && typeof emotionPieChart.dispose === 'function') emotionPieChart.dispose();
 
   trajectoryChart = null;
-  confidenceChart = null;
   emotionPieChart = null;
 
   if (resizeTimer) clearTimeout(resizeTimer);
@@ -462,7 +419,6 @@ onUnmounted(() => {
 
   // 清理所有图表实例
   if (trajectoryChart && typeof trajectoryChart.dispose === 'function') trajectoryChart.dispose();
-  if (confidenceChart && typeof confidenceChart.dispose === 'function') confidenceChart.dispose();
   if (emotionPieChart && typeof emotionPieChart.dispose === 'function') emotionPieChart.dispose();
 });
 </script>
@@ -658,20 +614,17 @@ onUnmounted(() => {
         </el-col>
       </el-row>
 
-      <!-- 模块 5：AI 系统健康度 -->
+      <!-- 模块 5：情绪类别占比 -->
       <el-row :gutter="16" class="module-row">
         <el-col :span="24">
           <el-card class="module-card" shadow="hover">
             <template #header>
               <div class="card-header">
                 <el-icon><CircleCheck /></el-icon>
-                <span>AI 系统健康度</span>
+                <span>情绪类别占比</span>
               </div>
             </template>
-            <div class="health-metrics">
-              <div ref="confidenceChartRef" class="confidence-chart"></div>
-              <div ref="emotionPieChartRef" class="emotion-pie-chart"></div>
-            </div>
+            <div ref="emotionPieChartRef" class="emotion-pie-chart"></div>
           </el-card>
         </el-col>
       </el-row>
@@ -1044,18 +997,10 @@ onUnmounted(() => {
   background: rgba(230, 162, 60, 0.3);
 }
 
-/* AI 健康度 */
-.health-metrics {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 16px;
-}
-
-.confidence-chart,
+/* 情绪类别占比 */
 .emotion-pie-chart {
-  height: 250px;
+  height: 300px;
   width: 100%;
-  grid-column: span 2;
 }
 
 /* 滚动条样式 */
@@ -1086,9 +1031,6 @@ onUnmounted(() => {
     max-height: 200px;
   }
 
-  .health-metrics {
-    grid-template-columns: 1fr;
-  }
 }
 
 @media (max-width: 1200px) {
