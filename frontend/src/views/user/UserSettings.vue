@@ -369,6 +369,12 @@ onMounted(() => {
 <style scoped>
 
 .settings-container { padding: 20px; }
+.settings-container .el-col {
+  display: flex;
+}
+.settings-container .el-col > .el-card {
+  width: 100%;
+}
 .face-section { text-align: center; padding: 10px; min-height: 200px; }
 .face-status h3 { margin: 10px 0 5px; font-weight: 600; }
 .success-text { color: #67C23A; }
