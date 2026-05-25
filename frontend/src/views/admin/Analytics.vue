@@ -611,18 +611,15 @@ onUnmounted(() => {
               </div>
             </div>
             <el-divider />
-            <el-collapse>
-              <el-collapse-item title="如何看懂这个图表？">
-                <div class="trajectory-guide">
-                  <p><strong>Y 轴（效价值）：</strong>范围 -1 到 +1，正值表示积极情绪，负值表示消极情绪。</p>
-                  <p><strong>灰色散点：</strong>每次摄像头检测的原始情绪值，存在噪声波动。</p>
-                  <p><strong>紫色平滑曲线：</strong>经卡尔曼滤波去噪后的情绪趋势，反映真实情绪走向。</p>
-                  <p><strong>绿色吸引子基线：</strong>统计周期内用户情绪的"稳态"锚点，情绪长期围绕此基线波动。</p>
-                  <p><strong>±2σ 橙色边界：</strong>正常波动范围。曲线持续超出此边界意味着情绪显著偏离常态，需关注。</p>
-                  <p class="guide-tip">简单判断：曲线在绿色线附近小幅摆动 = 情绪稳定；曲线持续低于绿色线且触碰下边界 = 情绪低落需干预。</p>
-                </div>
-              </el-collapse-item>
-            </el-collapse>
+            <div class="trajectory-guide">
+              <h4>图表解读</h4>
+              <p><strong>Y 轴（效价值）：</strong>范围 -1 到 +1，正值表示积极情绪，负值表示消极情绪。</p>
+              <p><strong>灰色散点：</strong>每次摄像头检测的原始情绪值，存在噪声波动。</p>
+              <p><strong>紫色平滑曲线：</strong>经卡尔曼滤波去噪后的情绪趋势，反映真实情绪走向。</p>
+              <p><strong>绿色吸引子基线：</strong>统计周期内用户情绪的"稳态"锚点，情绪长期围绕此基线波动。</p>
+              <p><strong>±2σ 橙色边界：</strong>正常波动范围。曲线持续超出此边界意味着情绪显著偏离常态，需关注。</p>
+              <p class="guide-tip">简单判断：曲线在绿色线附近小幅摆动 = 情绪稳定；曲线持续低于绿色线且触碰下边界 = 情绪低落需干预。</p>
+            </div>
           </el-card>
         </el-col>
       </el-row>
@@ -1011,6 +1008,12 @@ onUnmounted(() => {
 }
 
 /* 轨迹图表解读指引 */
+.trajectory-guide h4 {
+  margin: 0 0 8px 0;
+  font-size: 14px;
+  color: #303133;
+}
+
 .trajectory-guide {
   font-size: 13px;
   color: #606266;
