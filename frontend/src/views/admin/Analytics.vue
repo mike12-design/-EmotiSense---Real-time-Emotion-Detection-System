@@ -2,7 +2,7 @@
   EmotiSense 管理后台 - 数据分析页面
 
   功能模块：
-  1. 高危干预预警台（实时警报 + 四象限散点图）
+  1. 高危干预预警台（实时警报）
   2. 个体情绪动态轨迹图（卡尔曼滤波可视化）
   3. 干预效果事件轴
   4. 多模态日记 - 视觉冲突监控板
@@ -54,7 +54,6 @@ const comprehensiveReport = ref(null);
 
 // 模块 1：高危预警台数据
 const alertFeed = ref([]);
-const quadrantData = ref([]);
 
 // 模块 2：情绪轨迹图
 const trajectoryData = ref({
@@ -84,7 +83,6 @@ const systemHealth = ref({
 });
 
 // DOM 引用
-const quadrantChartRef = ref(null);
 const trajectoryChartRef = ref(null);
 const eventTimelineChartRef = ref(null);
 const conflictChartRef = ref(null);
@@ -92,7 +90,6 @@ const confidenceChartRef = ref(null);
 const emotionPieChartRef = ref(null);
 
 // 图表实例缓存
-let quadrantChart = null;
 let trajectoryChart = null;
 let eventTimelineChart = null;
 let conflictChart = null;
@@ -146,17 +143,6 @@ const fetchAlertFeed = async () => {
   } catch (e) {
     // 静默失败，不影响主功能
     console.error('警报数据加载失败:', e);
-  }
-};
-
-// ============ 获取四象限数据 ============
-const fetchQuadrantData = async () => {
-  try {
-    const res = await axios.get(`${API_BASE}/admin/analytics/quadrant`);
-    quadrantData.value = res.data.users || [];
-    renderQuadrantChart();
-  } catch (e) {
-    console.error('四象限数据加载失败:', e);
   }
 };
 
@@ -268,102 +254,7 @@ const fetchAdvancedAnalytics = async () => {
   }
 };
 
-// ============ 模块 1：四象限散点图 ============
-const renderQuadrantChart = () => {
-  if (!quadrantChartRef.value) return;
-  if (!quadrantChart) quadrantChart = echarts.init(quadrantChartRef.value);
-
-  // 准备数据
-  const scatterData = quadrantData.value.map(u => [
-    u.valence || 0,  // X 轴：效价
-    u.rmssd || 0,    // Y 轴：波动率
-    u.username,      // 用户名
-    u.risk_level || 'low'  // 风险等级
-  ]);
-
-  // 风险颜色映射
-  const riskColors = {
-    high: '#f56c6c',    // 红
-    medium: '#e6a23c',  // 橙
-    low: '#67c23a'      // 绿
-  };
-
-  quadrantChart.setOption({
-    title: {
-      text: '用户情绪四象限分布',
-      left: 'center',
-      textStyle: { fontSize: 16, fontWeight: 'bold' }
-    },
-    tooltip: {
-      formatter: (params) => {
-        const riskText = params.data[3] === 'high' ? '高风险' : params.data[3] === 'medium' ? '中风险' : '低风险';
-        return `<b>${params.data[2]}</b><br/>效价：${params.data[0]}<br/>波动率：${params.data[1]}<br/>风险：${riskText}`;
-      }
-    },
-    xAxis: {
-      name: '效价 (Valence)',
-      nameLocation: 'middle',
-      nameGap: 30,
-      min: -1.2,
-      max: 1.2,
-      splitLine: { show: true, lineStyle: { type: 'dashed' } }
-    },
-    yAxis: {
-      name: '波动率 (RMSSD)',
-      nameLocation: 'middle',
-      nameGap: 40,
-      min: 0,
-      max: 1,
-      splitLine: { show: true, lineStyle: { type: 'dashed' } }
-    },
-    series: [{
-      type: 'scatter',
-      data: scatterData,
-      symbolSize: (data) => {
-        // 高风险用户显示更大的点
-        return data[3] === 'high' ? 20 : data[3] === 'medium' ? 15 : 12;
-      },
-      itemStyle: {
-        color: (params) => riskColors[params.data[3]] || '#999'
-      },
-      label: {
-        show: true,
-        formatter: (params) => params.data[2],
-        position: 'top',
-        fontSize: 10
-      }
-    }],
-    // 区域标注
-    markArea: {
-      itemStyle: {
-        color: [
-          ['rgba(245, 108, 108, 0.1)', 'rgba(245, 108, 108, 0.05)'],  // 左下：抑郁重灾区
-          ['rgba(230, 162, 60, 0.1)', 'rgba(230, 162, 60, 0.05)']    // 左上：崩溃边缘区
-        ]
-      },
-      data: [
-        [{
-          name: '抑郁重灾区\n(深陷悲伤)',
-          xAxis: -1.2,
-          yAxis: 0
-        }, {
-          xAxis: 0,
-          yAxis: 0.3
-        }],
-        [{
-          name: '崩溃边缘区\n(情绪不稳定)',
-          xAxis: -1.2,
-          yAxis: 0.3
-        }, {
-          xAxis: 0,
-          yAxis: 1
-        }]
-      ]
-    }
-  });
-};
-
-// ============ 模块 2：情绪轨迹图 ============
+// ============ 模块 1：情绪轨迹图 ============
 const renderTrajectoryChart = () => {
   if (!trajectoryChartRef.value) return;
   if (!trajectoryChart) trajectoryChart = echarts.init(trajectoryChartRef.value);
@@ -633,7 +524,6 @@ const renderAiHealthEmotionPieChart = (pieData) => {
 const handleResize = () => {
   if (resizeTimer) clearTimeout(resizeTimer);
   resizeTimer = setTimeout(() => {
-    if (quadrantChart && typeof quadrantChart.resize === 'function') quadrantChart.resize();
     if (trajectoryChart && typeof trajectoryChart.resize === 'function') trajectoryChart.resize();
     if (eventTimelineChart && typeof eventTimelineChart.resize === 'function') eventTimelineChart.resize();
     if (conflictChart && typeof conflictChart.resize === 'function') conflictChart.resize();
@@ -659,14 +549,12 @@ const handleViewDiaryDetail = () => {
 // 用户选择
 const handleUserSelect = (userId) => {
   // 清理旧图表
-  if (quadrantChart && typeof quadrantChart.dispose === 'function') quadrantChart.dispose();
   if (trajectoryChart && typeof trajectoryChart.dispose === 'function') trajectoryChart.dispose();
   if (eventTimelineChart && typeof eventTimelineChart.dispose === 'function') eventTimelineChart.dispose();
   if (conflictChart && typeof conflictChart.dispose === 'function') conflictChart.dispose();
   if (confidenceChart && typeof confidenceChart.dispose === 'function') confidenceChart.dispose();
   if (emotionPieChart && typeof emotionPieChart.dispose === 'function') emotionPieChart.dispose();
 
-  quadrantChart = null;
   trajectoryChart = null;
   eventTimelineChart = null;
   conflictChart = null;
@@ -678,7 +566,7 @@ const handleUserSelect = (userId) => {
   advancedStats.value = null;
   selectedUserId.value = userId;
   fetchAlertFeed();
-  fetchQuadrantData();
+
   fetchTrajectoryData();
   fetchInterventionEvents();
   fetchConflictData();
@@ -688,7 +576,7 @@ const handleUserSelect = (userId) => {
 // 时间范围选择
 const handleTimeRangeChange = () => {
   fetchAlertFeed();
-  fetchQuadrantData();
+
   fetchTrajectoryData();
   fetchInterventionEvents();
   fetchConflictData();
@@ -749,7 +637,7 @@ onMounted(() => {
   fetchCurrentUser();
   fetchUserList();
   fetchAlertFeed();
-  fetchQuadrantData();
+
   fetchSystemHealth();
   window.addEventListener('resize', handleResize);
 
@@ -765,7 +653,6 @@ onUnmounted(() => {
   if (resizeTimer) clearTimeout(resizeTimer);
 
   // 清理所有图表实例
-  if (quadrantChart && typeof quadrantChart.dispose === 'function') quadrantChart.dispose();
   if (trajectoryChart && typeof trajectoryChart.dispose === 'function') trajectoryChart.dispose();
   if (eventTimelineChart && typeof eventTimelineChart.dispose === 'function') eventTimelineChart.dispose();
   if (conflictChart && typeof conflictChart.dispose === 'function') conflictChart.dispose();
@@ -883,7 +770,7 @@ onUnmounted(() => {
       <!-- 模块 1：高危干预预警台 -->
       <el-row :gutter="16" class="module-row">
         <!-- 实时警报滚动条 -->
-        <el-col :span="12">
+        <el-col :span="24">
           <el-card class="alert-card" shadow="hover">
             <template #header>
               <div class="card-header">
@@ -928,19 +815,6 @@ onUnmounted(() => {
                 </div>
               </div>
             </div>
-          </el-card>
-        </el-col>
-
-        <!-- 四象限散点图 -->
-        <el-col :span="12">
-          <el-card class="quadrant-card" shadow="hover">
-            <template #header>
-              <div class="card-header">
-                <el-icon><TrendCharts /></el-icon>
-                <span>用户情绪四象限</span>
-              </div>
-            </template>
-            <div ref="quadrantChartRef" class="quadrant-chart"></div>
           </el-card>
         </el-col>
       </el-row>
@@ -1394,16 +1268,6 @@ onUnmounted(() => {
 .no-alerts {
   text-align: center;
   padding: 40px 0;
-}
-
-/* 四象限图表 */
-.quadrant-card {
-  margin-bottom: 16px;
-}
-
-.quadrant-chart {
-  height: 300px;
-  width: 100%;
 }
 
 /* 轨迹图 */
