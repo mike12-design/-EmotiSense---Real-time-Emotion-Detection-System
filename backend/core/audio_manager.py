@@ -49,8 +49,10 @@ class AudioManager:
             logger.warning(f"情绪 {emotion} 未找到任何(专属或全局)音乐资源")
             return
 
-        # 4. 播放音乐
+        # 4. 播放音乐（filepath 可能是绝对路径或相对路径，统一处理）
         file_path = Path(music_record.filepath)
+        if not file_path.is_absolute():
+            file_path = self.assets_dir.parent / file_path
         if file_path.exists():
             try:
                 # 记录状态
@@ -58,7 +60,7 @@ class AudioManager:
                 self.current_music_path = str(file_path)
                 
                 pygame.mixer.music.load(str(file_path))
-                pygame.mixer.music.play(-1) # -1 表示循环播放这首抽中的歌
+                pygame.mixer.music.play(0)  # 播完一首即停，不循环
                 logger.info(f"正在播放音乐: [{emotion}] {music_record.title}")
             except Exception as e:
                 logger.error(f"播放失败: {e}")
@@ -66,8 +68,9 @@ class AudioManager:
             logger.error(f"数据库记录的文件不存在: {file_path}")
 
     def _get_random_music(self, emotion: str, db: Session, username: str = None):
-        """核心逻辑：从数据库随机获取一首音乐 (优先级：专属 > 全局)"""
-        
+        """核心逻辑：从数据库随机获取一首音乐 (优先级：专属 > 全局，排除用户隐藏的全局资源)"""
+        from .models import UserHiddenGlobal
+
         target_music_list = []
 
         # 1. 尝试获取专属音乐
@@ -80,18 +83,29 @@ class AudioManager:
                     MusicLibrary.is_active == True
                 ).all()
 
-        # 2. 如果专属音乐库为空，则获取全局音乐 (user_id 为空)
+        # 2. 如果专属音乐库为空，则获取全局音乐（排除该用户隐藏的）
         if not target_music_list:
-            target_music_list = db.query(MusicLibrary).filter(
+            global_query = db.query(MusicLibrary).filter(
                 MusicLibrary.user_id == None,
                 MusicLibrary.emotion_tag == emotion,
                 MusicLibrary.is_active == True
-            ).all()
+            )
+            if username and username != "Stranger":
+                user = db.query(User).filter(User.username == username).first()
+                if user:
+                    hidden_ids = [h.item_id for h in db.query(UserHiddenGlobal).filter(
+                        UserHiddenGlobal.user_id == user.id,
+                        UserHiddenGlobal.item_type == "music"
+                    ).all()]
+                    if hidden_ids:
+                        global_query = global_query.filter(~MusicLibrary.id.in_(hidden_ids))
+
+            target_music_list = global_query.all()
 
         # 3. 如果找到了资源，随机选一个返回
         if target_music_list:
             return random.choice(target_music_list)
-        
+
         return None
 
     async def play_comfort_voice(self, text):
