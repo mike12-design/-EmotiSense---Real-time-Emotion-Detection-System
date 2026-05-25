@@ -37,11 +37,6 @@
         </el-menu-item>
       </el-menu>
 
-      <!-- 底部返回按钮 -->
-      <div class="back-btn" @click="router.push('/')">
-        <el-icon><Monitor /></el-icon>
-        <span>返回监测页面</span>
-      </div>
     </el-aside>
 
     <el-container class="main-container">
@@ -89,7 +84,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useSensingStore } from '../stores/sensing'
 import {
   Odometer, User, DataAnalysis, Files, Document,
-  Monitor, SwitchButton, UserFilled, House
+  SwitchButton, UserFilled, House
 } from '@element-plus/icons-vue'
 
 const route = useRoute()
@@ -203,23 +198,6 @@ const handleLogout = () => {
   font-weight: 500;
 }
 
-/* 底部返回按钮 */
-.back-btn {
-  margin: 16px;
-  padding: 12px 16px;
-  background: rgba(14, 165, 233, 0.15);
-  border-radius: 12px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  color: #7dd3fc;
-  font-size: 13px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.25s;
-  border: 1px solid rgba(14, 165, 233, 0.2);
-}
 
 .back-btn:hover {
   background: rgba(14, 165, 233, 0.25);
