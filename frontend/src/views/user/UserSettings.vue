@@ -153,9 +153,17 @@
             </el-input>
           </div>
 
+          <!-- 筛选 -->
+          <el-select v-model="scriptFilterEmotion" style="width: 120px" clearable placeholder="全部情绪" size="small" class="mb-2">
+            <el-option label="😊 开心" value="happy" />
+            <el-option label="😢 难过" value="sad" />
+            <el-option label="😡 愤怒" value="angry" />
+            <el-option label="😐 平静" value="neutral" />
+          </el-select>
+
           <!-- 话术列表 -->
           <div class="script-list-container">
-            <el-table :data="scriptList" style="width: 100%" height="250" stripe>
+            <el-table :data="filteredScriptList" style="width: 100%" height="250" stripe>
               <el-table-column prop="emotion_tag" label="情绪" width="100">
                 <template #default="scope">
                   <el-tag :type="getEmotionTagType(scope.row.emotion_tag)">
