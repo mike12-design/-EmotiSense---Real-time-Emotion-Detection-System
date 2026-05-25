@@ -614,20 +614,16 @@ def gen_from_video():
                             user_id = primary_face.get("user_id")
                             emotion = dyn.primary_emotion
 
-                            try:
-                                audio_manager.play_music_for_emotion(emotion, SessionLocal(), username)
-                            except Exception as e:
-                                logger.warning(f"音乐播放失败: {e}")
-
+                            # 查询 TTS 话术
+                            tts_text = None
                             try:
                                 inter_db = SessionLocal()
+                                script_obj = None
                                 if user_id:
                                     script_obj = inter_db.query(ComfortScript).filter(
                                         ComfortScript.emotion_tag == emotion,
                                         ComfortScript.user_id == user_id
                                     ).order_by(func.random()).first()
-                                else:
-                                    script_obj = None
 
                                 if not script_obj:
                                     hidden_ids = []
@@ -646,15 +642,24 @@ def gen_from_video():
 
                                 if script_obj:
                                     tts_text = script_obj.content
-                                    def _tts_worker(text):
-                                        asyncio.run(audio_manager.play_comfort_voice(text))
-                                    th.Thread(target=_tts_worker, args=(tts_text,), daemon=True).start()
-                                    logger.info(f"🎤 TTS 推送: [{emotion}] {tts_text[:30]}...")
-                                else:
-                                    logger.info(f"🎤 TTS 跳过: 情绪 [{emotion}] 无匹配话术")
                                 inter_db.close()
                             except Exception as e:
-                                logger.warning(f"TTS 推送失败: {e}")
+                                logger.warning(f"TTS 话术查询失败: {e}")
+
+                            # 后台线程：先 TTS → 再播放音乐
+                            def _intervention_worker(tts, _emotion, _username):
+                                try:
+                                    if tts:
+                                        asyncio.run(audio_manager.play_comfort_voice(tts))
+                                    audio_manager.play_music_for_emotion(_emotion, SessionLocal(), _username)
+                                except Exception as e:
+                                    logger.warning(f"干预执行失败: {e}")
+
+                            th.Thread(target=_intervention_worker, args=(tts_text, emotion, username), daemon=True).start()
+                            if tts_text:
+                                logger.info(f"🎤 TTS 推送: [{emotion}] {tts_text[:30]}... → 随后播放音乐")
+                            else:
+                                logger.info(f"直接播放音乐: [{emotion}] 无匹配话术")
 
                             try:
                                 inter_db2 = SessionLocal()
@@ -1798,7 +1803,7 @@ async def get_alert_feed(
     for event in events:
         event_username = event.username or "系统"
         event_data = {
-            "timestamp": event.timestamp.strftime("%H:%M:%S"),
+            "timestamp": event.timestamp.strftime("%Y-%m-%d %H:%M:%S"),
             "username": event_username,
             "condition": _describe_action(event.action_type),
             "risk_level": "low",
@@ -1817,7 +1822,7 @@ async def get_alert_feed(
         log_cutoff = start_time
     else:
         users = db.query(User).all()
-        log_cutoff = max(start_time, now - timedelta(hours=1))
+        log_cutoff = start_time
 
     valence_map = {
         "happy": 1.0, "surprise": 0.3, "neutral": 0.0,
@@ -1864,7 +1869,7 @@ async def get_alert_feed(
 
         if risk_level != "low":
             alerts.append({
-                "timestamp": recent_logs[0].timestamp.strftime("%H:%M:%S"),
+                "timestamp": recent_logs[0].timestamp.strftime("%Y-%m-%d %H:%M:%S"),
                 "username": user.username,
                 "condition": condition,
                 "risk_level": risk_level,
