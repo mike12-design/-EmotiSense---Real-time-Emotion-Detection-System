@@ -7,9 +7,9 @@
       <el-col :span="12">
         <el-card header="安全设置" shadow="hover">
           <el-form label-position="top">
-            <el-form-item label="旧密码"><el-input type="password" placeholder="请输入旧密码" /></el-form-item>
-            <el-form-item label="新密码"><el-input type="password" placeholder="请输入新密码" /></el-form-item>
-            <el-button type="primary" class="w-100">保存修改</el-button>
+            <el-form-item label="旧密码"><el-input v-model="oldPassword" type="password" placeholder="请输入旧密码" /></el-form-item>
+            <el-form-item label="新密码"><el-input v-model="newPassword" type="password" placeholder="请输入新密码" /></el-form-item>
+            <el-button type="primary" class="w-100" :loading="passwordSubmitting" @click="changePassword">保存修改</el-button>
           </el-form>
         </el-card>
       </el-col>
@@ -66,7 +66,7 @@
     <!-- 上传 -->
     <el-form :inline="true" size="small">
       <el-form-item label="情绪">
-        <el-select v-model="musicEmotion" style="width: 120px">
+        <el-select v-model="musicEmotion" style="width: 120px" clearable placeholder="全部">
           <el-option label="😊 开心" value="happy" />
           <el-option label="😢 难过" value="sad" />
           <el-option label="😡 愤怒" value="angry" />
@@ -88,7 +88,7 @@
     </el-form>
 
     <!-- 列表 -->
-    <el-table :data="userMusicList" height="300" stripe border size="small">
+    <el-table :data="filteredMusicList" height="300" stripe border size="small">
       <el-table-column prop="emotion_tag" label="情绪" width="90">
         <template #default="scope">
           <el-tag :type="getEmotionTagType(scope.row.emotion_tag)" size="small">
@@ -208,7 +208,7 @@
 <script setup>
 
 const userMusicList = ref([])
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, computed } from 'vue';
 import { 
   CircleCheckFilled, WarningFilled, UploadFilled, Headset,
   ChatDotRound, Refresh, Delete, VideoPlay, VideoPause
@@ -232,11 +232,27 @@ const musicEmotion = ref('');
 const audioRef = ref(null);
 const playingMusicId = ref(null);
 
+// ===== 密码模块变量 =====
+const oldPassword = ref('');
+const newPassword = ref('');
+const passwordSubmitting = ref(false);
+
 // ===== 话术模块变量 =====
 const scriptList = ref([]);
 const newScriptContent = ref('');
-const newScriptEmotion = ref('sad'); // 默认选中难过，因为这个最常用
+const newScriptEmotion = ref('sad');
 const scriptSubmitting = ref(false);
+const scriptFilterEmotion = ref('');
+
+// ===== 计算属性：情绪筛选 =====
+const filteredMusicList = computed(() => {
+  if (!musicEmotion.value) return userMusicList.value;
+  return userMusicList.value.filter(m => m.emotion_tag === musicEmotion.value);
+});
+const filteredScriptList = computed(() => {
+  if (!scriptFilterEmotion.value) return scriptList.value;
+  return scriptList.value.filter(s => s.emotion_tag === scriptFilterEmotion.value);
+});
 
 // ==========================================
 // 1. 用户信息与人脸逻辑 (原有)
@@ -251,6 +267,29 @@ const fetchUserInfo = async () => {
     ElMessage.error("获取用户信息失败");
   } finally {
     loading.value = false;
+  }
+};
+
+const changePassword = async () => {
+  if (!oldPassword.value) return ElMessage.warning('请输入旧密码');
+  if (!newPassword.value) return ElMessage.warning('请输入新密码');
+  passwordSubmitting.value = true;
+  try {
+    const res = await axios.post(`${API_BASE}/api/user/change_password`, {
+      username,
+      old_password: oldPassword.value,
+      new_password: newPassword.value
+    });
+    if (res.data.success) {
+      ElMessage.success('密码修改成功');
+      oldPassword.value = '';
+      newPassword.value = '';
+    }
+  } catch (err) {
+    const msg = err.response?.data?.detail || '修改失败';
+    ElMessage.error(msg);
+  } finally {
+    passwordSubmitting.value = false;
   }
 };
 
