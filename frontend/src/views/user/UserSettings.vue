@@ -99,14 +99,25 @@
 
       <el-table-column prop="title" label="歌名" />
 
-      <el-table-column label="操作" width="60" align="center">
+      <el-table-column label="操作" width="120" align="center">
         <template #default="scope">
+          <el-button
+            :type="playingMusicId === scope.row.id ? 'warning' : 'primary'"
+            link
+            @click="handlePlayMusic(scope.row)"
+          >
+            <el-icon :size="18">
+              <VideoPause v-if="playingMusicId === scope.row.id" />
+              <VideoPlay v-else />
+            </el-icon>
+          </el-button>
           <el-button type="danger" link @click="handleDeleteMusic(scope.row.id)">
             删除
           </el-button>
         </template>
       </el-table-column>
     </el-table>
+    <audio ref="audioRef" @ended="playingMusicId = null" style="display:none" />
   </el-card>
 </el-col>
 
@@ -199,8 +210,8 @@
 const userMusicList = ref([])
 import { ref, onMounted } from 'vue';
 import { 
-  CircleCheckFilled, WarningFilled, UploadFilled, Headset, 
-  ChatDotRound, Refresh, Delete 
+  CircleCheckFilled, WarningFilled, UploadFilled, Headset,
+  ChatDotRound, Refresh, Delete, VideoPlay, VideoPause
 } from '@element-plus/icons-vue';
 import axios from 'axios';
 import { ElMessage, ElMessageBox } from 'element-plus';
@@ -217,7 +228,9 @@ const hasFace = ref(false);
 const videoUrl = ref('');
 
 // ===== 音乐模块变量 =====
-const musicEmotion = ref(''); 
+const musicEmotion = ref('');
+const audioRef = ref(null);
+const playingMusicId = ref(null);
 
 // ===== 话术模块变量 =====
 const scriptList = ref([]);
@@ -344,6 +357,21 @@ const fetchUserMusic = async () => {
   }
 }
 
+
+const handlePlayMusic = (row) => {
+  const audio = audioRef.value;
+  if (!audio) return;
+
+  if (playingMusicId.value === row.id) {
+    audio.pause();
+    playingMusicId.value = null;
+    return;
+  }
+
+  audio.src = `${API_BASE}/${row.filepath}`;
+  audio.play().catch(() => ElMessage.error("播放失败"));
+  playingMusicId.value = row.id;
+};
 
 const handleDeleteMusic = async (id) => {
   ElMessageBox.confirm('确定删除吗？', '提示').then(async () => {
