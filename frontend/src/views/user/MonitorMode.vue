@@ -75,37 +75,7 @@
 
         <!-- 左侧栏 -->
         <div class="col-left">
-          <!-- 1. 日历卡片 -->
-          <div class="card calendar-card">
-            <div class="card-header">
-              <el-icon class="card-icon"><Calendar /></el-icon>
-              <h3 class="card-title">情绪分布</h3>
-              <span class="card-subtitle">本月</span>
-            </div>
-            <div class="calendar-grid">
-              <div v-for="d in ['日','一','二','三','四','五','六']" :key="d" class="weekday-header">
-                {{ d }}
-              </div>
-
-              <div
-                v-for="i in 30"
-                :key="i"
-                class="day-cell"
-                :class="{ today: i === todayDate }"
-              >
-                <span class="day-number">{{ i }}</span>
-                <div
-                  v-if="dailyMoods[i]"
-                  class="mood-emoji-wrap"
-                  :title="`${i}号：${dailyMoods[i]}`"
-                >
-                  {{ getMoodEmoji(dailyMoods[i]) }}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- 2. 感知日志 -->
+          <!-- 感知日志 -->
           <div class="card log-card">
             <div class="card-header">
               <div class="pulse-indicator"></div>
@@ -248,7 +218,7 @@ import axios from 'axios'
 import screenfull from 'screenfull'
 import { ElMessage } from 'element-plus'
 import {
-  HomeFilled, TrendCharts, Setting, InfoFilled, Calendar,
+  HomeFilled, TrendCharts, Setting, InfoFilled,
   FullScreen, Edit, EditPen, ArrowRight, Camera, VideoPlay, VideoPause
 } from '@element-plus/icons-vue'
 import { useSensingStore } from '../../stores/sensing'
@@ -266,10 +236,6 @@ const username = ref('')
 const appRoot = ref(null)
 const isFullscreen = ref(false)
 const audioPlayer = ref(null)
-
-// 日历相关
-const todayDate = new Date().getDate()
-const dailyMoods = ref({})
 
 // 日记相关
 const diaries = ref([])
@@ -307,7 +273,6 @@ onMounted(() => {
 
   store.setAudioPlayer(audioPlayer.value)
   fetchDiaries()
-  fetchCalendarData()
 })
 
 onUnmounted(() => {
@@ -332,19 +297,6 @@ const fetchDiaries = async () => {
     diaries.value = res.data
   } catch (e) {
     console.warn('日记数据加载失败')
-  }
-}
-
-const fetchCalendarData = async () => {
-  if (isGuest.value) return
-  try {
-    dailyMoods.value = {
-      [todayDate]: currentEmotion.value.toLowerCase(),
-      [todayDate - 1]: 'sad',
-      [todayDate - 2]: 'happy'
-    }
-  } catch (e) {
-    console.warn('日历数据失败')
   }
 }
 
@@ -641,68 +593,15 @@ const toggleFullscreen = () => {
   overflow: hidden;
 }
 
-/* 日历 */
-.calendar-grid {
-  display: grid;
-  grid-template-columns: repeat(7, 1fr);
-  gap: 6px;
-}
-
-.weekday-header {
-  text-align: center;
-  font-size: 11px;
-  color: var(--text-tertiary);
-  font-weight: 500;
-  padding: 4px 0;
-}
-
-.day-cell {
-  aspect-ratio: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  font-size: 11px;
-  background: rgba(249, 250, 251, 0.6);
-  border-radius: 10px;
-  color: var(--text-secondary);
-  position: relative;
-  transition: all 0.2s;
-}
-
-.day-cell:hover {
-  background: var(--primary-50);
-  transform: scale(1.05);
-}
-
-.day-number {
-  margin-top: -2px;
-  font-size: 10px;
-}
-
-.mood-emoji-wrap {
-  font-size: 14px;
-  line-height: 1;
-  margin-top: 2px;
-  filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.08));
-  animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-}
-
-@keyframes popIn {
-  0% { transform: scale(0); opacity: 0; }
-  100% { transform: scale(1); opacity: 1; }
-}
-
-.day-cell.today {
-  background: var(--primary-100);
-  color: var(--primary-700);
-  font-weight: 600;
-  border: 1px solid var(--primary-200);
-}
-
 /* 日志 */
 .log-card {
   flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.log-card :deep(.card-header) {
+  flex-shrink: 0;
 }
 
 .log-list {
