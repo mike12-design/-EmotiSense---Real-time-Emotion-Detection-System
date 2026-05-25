@@ -118,8 +118,10 @@
             <el-table-column label="置信度" min-width="180">
               <template #default="{ row }">
                 <div class="score-cell">
-                  <el-progress :percentage="scorePercent(row.score)" :stroke-width="8" :color="scoreColor(row.score)" :show-text="false" />
                   <span class="score-num">{{ scorePercent(row.score) }}%</span>
+                  <div class="score-bar-track">
+                    <div class="score-bar-fill" :style="{ width: scorePercent(row.score) + '%' }"></div>
+                  </div>
                 </div>
               </template>
             </el-table-column>
@@ -238,7 +240,6 @@ const emotionColor = m => ({ happy:'#67c23a', sad:'#409eff', angry:'#f56c6c', ne
 const emotionColorBg = m => ({ happy:'#f0f9eb', sad:'#ecf5ff', angry:'#fef0f0', neutral:'#f4f4f5', fear:'#fdf6ec', surprise:'#f3e8ff' })[m?.toLowerCase()] || '#f4f4f5'
 
 const scorePercent = s => Math.round((s || 0) * 100)
-const scoreColor = s => s > 0.8 ? '#67c23a' : s > 0.5 ? '#e6a23c' : '#909399'
 
 const distMax = () => Math.max(...(stats.emotion_distribution || []).map(d => d.count), 1)
 const distPercent = count => Math.round((count / distMax()) * 100)
@@ -304,7 +305,9 @@ onMounted(async () => {
 .user-avatar-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
 .emotion-tag { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 12px; font-weight: 500; }
 .score-cell { display: flex; align-items: center; gap: 10px; }
-.score-num { font-size: 12px; color: #909399; min-width: 36px; }
+.score-num { font-size: 13px; font-weight: 600; color: #303133; min-width: 38px; }
+.score-bar-track { flex: 1; height: 6px; border-radius: 3px; background: #f0f0f0; overflow: hidden; }
+.score-bar-fill { height: 100%; border-radius: 3px; background: linear-gradient(90deg, #60a5fa, #3b82f6); transition: width .4s ease; }
 
 .pagination-wrap { margin-top: 16px; display: flex; justify-content: flex-end; }
 
