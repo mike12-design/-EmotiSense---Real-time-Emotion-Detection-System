@@ -10,7 +10,7 @@
           <p class="page-subtitle">管理系统注册用户及人脸特征数据</p>
         </div>
       </div>
-      <el-button class="btn-add" type="primary">
+      <el-button class="btn-add" type="primary" @click="openAddDialog">
         <el-icon><Plus /></el-icon>
         <span>新增用户</span>
       </el-button>
@@ -155,6 +155,38 @@
         </div>
       </template>
     </el-dialog>
+
+    <!-- 新增用户弹窗 -->
+    <el-dialog
+      v-model="addVisible"
+      title="新增用户"
+      width="460px"
+      :close-on-click-modal="false"
+      class="capture-dialog"
+    >
+      <el-form label-position="top" :model="addForm" ref="addFormRef">
+        <el-form-item label="用户名" required>
+          <el-input v-model="addForm.username" placeholder="请输入用户名" />
+        </el-form-item>
+        <el-form-item label="密码" required>
+          <el-input v-model="addForm.password" type="password" placeholder="请输入密码" show-password />
+        </el-form-item>
+        <el-form-item label="角色">
+          <el-select v-model="addForm.role" style="width: 100%">
+            <el-option label="普通用户" value="user" />
+            <el-option label="管理员" value="admin" />
+          </el-select>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button @click="addVisible = false" size="default">取消</el-button>
+          <el-button type="primary" :loading="addSubmitting" @click="handleAddUser" size="default">
+            确认创建
+          </el-button>
+        </div>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -176,6 +208,10 @@ const searchQuery = ref('')
 const captureVisible = ref(false)
 const currentUserId = ref(null)
 const isCapturing = ref(false)
+
+const addVisible = ref(false)
+const addSubmitting = ref(false)
+const addForm = ref({ username: '', password: '', role: 'user' })
 
 // 过滤后的用户列表
 const filteredUsers = computed(() => {
@@ -226,6 +262,32 @@ const handleCapture = async () => {
   }
 }
 
+const openAddDialog = () => {
+  addForm.value = { username: '', password: '', role: 'user' }
+  addVisible.value = true
+}
+
+const handleAddUser = async () => {
+  if (!addForm.value.username.trim()) return ElMessage.warning('请输入用户名')
+  if (!addForm.value.password) return ElMessage.warning('请输入密码')
+  addSubmitting.value = true
+  try {
+    await axios.post(`${API_BASE}/api/admin/users`, {
+      username: addForm.value.username.trim(),
+      password: addForm.value.password,
+      role: addForm.value.role
+    })
+    ElMessage.success('用户创建成功')
+    addVisible.value = false
+    fetchUsers()
+  } catch (err) {
+    const msg = err.response?.data?.detail || '创建失败'
+    ElMessage.error(msg)
+  } finally {
+    addSubmitting.value = false
+  }
+}
+
 const handleDelete = (user) => {
   ElMessageBox.confirm(
     `确定要删除用户 "${user.username}" 吗？此操作不可恢复。`,
@@ -237,11 +299,12 @@ const handleDelete = (user) => {
     }
   ).then(async () => {
     try {
-      // 这里调用删除 API
+      await axios.delete(`${API_BASE}/api/admin/users/${user.id}`)
       ElMessage.success('删除成功')
       fetchUsers()
     } catch (e) {
-      ElMessage.error('删除失败')
+      const msg = e.response?.data?.detail || '删除失败'
+      ElMessage.error(msg)
     }
   }).catch(() => {})
 }
