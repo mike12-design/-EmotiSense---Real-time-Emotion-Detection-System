@@ -1,286 +1,294 @@
-<!-- frontend/src/views/admin/SystemLogs.vue -->
 <template>
-  <div class="logs-container">
-    <el-card shadow="never" class="logs-card">
-      <!-- 头部：标题 + 筛选器 -->
-      <template #header>
-        <div class="header-box">
-          <div class="left-panel">
-            <el-icon class="icon-title" :size="20"><DataAnalysis /></el-icon>
-            <span class="title">用户情绪表现日志</span>
-          </div>
-          
-          <!-- 用户筛选器 -->
-          <div class="filter-box">
-            <span class="label">按用户筛选：</span>
-            <el-select 
-              v-model="selectedUser" 
-              placeholder="查看全部用户" 
-              clearable 
-              filterable
-              @change="handleFilterChange"
-              style="width: 200px"
-            >
-              <el-option
-                v-for="user in userList"
-                :key="user.id"
-                :label="user.username"
-                :value="user.username"
-              >
-                <span style="float: left">{{ user.username }}</span>
-                <span style="float: right; color: #8492a6; font-size: 13px">
-                  {{ user.role === 'admin' ? '管理员' : '用户' }}
-                </span>
-              </el-option>
-            </el-select>
-            
-            <el-button 
-              type="primary" 
-              icon="Refresh" 
-              circle 
-              plain 
-              class="ml-2"
-              @click="refreshData" 
-            />
-          </div>
+  <div class="logs-page">
+
+    <!-- 统计卡片行 -->
+    <div class="stats-row">
+      <div class="stat-card">
+        <div class="stat-icon" style="background:#ecf5ff;color:#409eff"><DataAnalysis /></div>
+        <div class="stat-body">
+          <div class="stat-value">{{ stats.total_count }}</div>
+          <div class="stat-label">总日志数</div>
         </div>
-      </template>
-
-      <!-- 数据表格 -->
-      <el-table 
-        :data="logs" 
-        v-loading="loading" 
-        stripe 
-        style="width: 100%"
-        :header-cell-style="{ background: '#f5f7fa', color: '#606266' }"
-      >
-        
-        <!-- 1. 捕获时间 -->
-        <el-table-column prop="timestamp" label="捕获时间" width="200">
-          <template #default="scope">
-            <div class="time-cell">
-              <el-icon><Clock /></el-icon>
-              <span>{{ formatTime(scope.row.timestamp) }}</span>
-            </div>
-          </template>
-        </el-table-column>
-
-        <!-- 2. 识别用户 -->
-<!-- 2. 识别用户 -->
-<el-table-column label="识别用户" width="180">
-  <template #default="scope">
-    <div class="user-cell">
-      <span class="username">{{ scope.row.username }}</span>
-    </div>
-  </template>
-</el-table-column>
-
-        <!-- 3. 情绪状态 -->
-        <el-table-column prop="emotion" label="情绪状态" width="160">
-          <template #default="scope">
-            <el-tag :type="getEmotionType(scope.row.emotion)" effect="light" round>
-              <span class="emoji">{{ getEmoji(scope.row.emotion) }}</span>
-              {{ scope.row.emotion.toUpperCase() }}
-            </el-tag>
-          </template>
-        </el-table-column>
-
-        <!-- 4. 情绪强度 (置信度) -->
-        <el-table-column label="情绪强度 (AI置信度)" min-width="200">
-          <template #default="scope">
-            <div class="score-wrapper">
-               <el-progress
-                :percentage="Math.round((scope.row.score || 0) * 100)"
-                :stroke-width="10"
-                :color="getScoreColor(scope.row.score)"
-                :format="percentage => `${percentage}%`"
-              />
-            </div>
-          </template>
-        </el-table-column>
-      </el-table>
-
-      <!-- 底部：分页 -->
-      <div class="pagination-container">
-        <el-pagination
-          background
-          layout="total, prev, pager, next, jumper"
-          :total="total"
-          :page-size="pageSize"
-          v-model:current-page="currentPage"
-          @current-change="handlePageChange"
-        />
       </div>
-    </el-card>
+      <div class="stat-card">
+        <div class="stat-icon" style="background:#f0f9eb;color:#67c23a"><Calendar /></div>
+        <div class="stat-body">
+          <div class="stat-value">{{ stats.today_count }}</div>
+          <div class="stat-label">今日记录</div>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon" style="background:#fdf6ec;color:#e6a23c"><UserFilled /></div>
+        <div class="stat-body">
+          <div class="stat-value">{{ stats.active_users }}</div>
+          <div class="stat-label">活跃用户</div>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon" style="background:#fef0f0;color:#f56c6c"><TrendCharts /></div>
+        <div class="stat-body">
+          <div class="stat-value">{{ stats.avg_mood }}</div>
+          <div class="stat-label">平均心情分</div>
+        </div>
+      </div>
+      <div class="stat-card dominant">
+        <div class="stat-icon" :style="{ background: emotionColorBg(stats.dominant_emotion), color: emotionColor(stats.dominant_emotion) }">
+          <span class="big-emoji">{{ getEmoji(stats.dominant_emotion) }}</span>
+        </div>
+        <div class="stat-body">
+          <div class="stat-value">{{ emotionLabel(stats.dominant_emotion) }}</div>
+          <div class="stat-label">主要情绪</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 内容区：筛选 + 表格 -->
+    <div class="content-row">
+      <!-- 左侧：日志表格 -->
+      <div class="table-panel">
+        <el-card shadow="never">
+          <template #header>
+            <div class="panel-header">
+              <span class="panel-title"><el-icon><List /></el-icon> 情绪日志</span>
+              <div class="filter-bar">
+                <el-radio-group v-model="daysFilter" size="small" @change="onFilterChange">
+                  <el-radio-button value="">全部</el-radio-button>
+                  <el-radio-button value="1">今天</el-radio-button>
+                  <el-radio-button value="7">近7天</el-radio-button>
+                  <el-radio-button value="30">近30天</el-radio-button>
+                </el-radio-group>
+                <el-select v-model="selectedEmotion" placeholder="情绪" clearable size="small" style="width:120px" @change="onFilterChange">
+                  <el-option v-for="e in emotions" :key="e.value" :label="e.label" :value="e.value" />
+                </el-select>
+                <el-select v-model="selectedUser" placeholder="用户" clearable filterable size="small" style="width:140px" @change="onFilterChange">
+                  <el-option v-for="u in userList" :key="u.id" :label="u.username" :value="u.username" />
+                </el-select>
+                <el-button size="small" @click="refreshData" circle><el-icon><Refresh /></el-icon></el-button>
+              </div>
+            </div>
+          </template>
+
+          <el-table :data="logs" v-loading="loading" stripe size="small" empty-text="暂无日志">
+            <el-table-column label="时间" width="170">
+              <template #default="{ row }">
+                <span class="time-text">{{ formatTime(row.timestamp) }}</span>
+              </template>
+            </el-table-column>
+            <el-table-column label="用户" width="120">
+              <template #default="{ row }">
+                <div class="user-chip">
+                  <span class="user-avatar-dot" :style="{ background: stringToColor(row.username) }"></span>
+                  {{ row.username }}
+                </div>
+              </template>
+            </el-table-column>
+            <el-table-column label="情绪" width="110">
+              <template #default="{ row }">
+                <span class="emotion-tag" :style="{ background: emotionColorBg(row.emotion), color: emotionColor(row.emotion) }">
+                  {{ getEmoji(row.emotion) }} {{ emotionLabel(row.emotion) }}
+                </span>
+              </template>
+            </el-table-column>
+            <el-table-column label="置信度" min-width="180">
+              <template #default="{ row }">
+                <div class="score-cell">
+                  <el-progress :percentage="scorePercent(row.score)" :stroke-width="8" :color="scoreColor(row.score)" :show-text="false" />
+                  <span class="score-num">{{ scorePercent(row.score) }}%</span>
+                </div>
+              </template>
+            </el-table-column>
+          </el-table>
+
+          <div class="pagination-wrap">
+            <el-pagination background layout="total, prev, pager, next" :total="total" :page-size="pageSize" v-model:current-page="currentPage" @current-change="fetchLogs" />
+          </div>
+        </el-card>
+      </div>
+
+      <!-- 右侧：情绪分布 -->
+      <div class="side-panel">
+        <el-card shadow="never">
+          <template #header>
+            <span class="panel-title"><el-icon><PieChart /></el-icon> 情绪分布</span>
+          </template>
+          <div class="dist-list" v-if="stats.emotion_distribution?.length">
+            <div v-for="item in stats.emotion_distribution" :key="item.emotion" class="dist-item">
+              <div class="dist-header">
+                <span>{{ getEmoji(item.emotion) }} {{ emotionLabel(item.emotion) }}</span>
+                <span class="dist-count">{{ item.count }}</span>
+              </div>
+              <div class="dist-bar-track">
+                <div class="dist-bar-fill" :style="{ width: distPercent(item.count) + '%', background: emotionColor(item.emotion) }"></div>
+              </div>
+            </div>
+          </div>
+          <div v-else class="empty-dist">暂无数据</div>
+        </el-card>
+      </div>
+    </div>
+
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
-import axios from 'axios';
-import { ElMessage } from 'element-plus';
-import { 
-  DataAnalysis, 
-  UserFilled, 
-  Clock, 
-  Refresh 
-} from '@element-plus/icons-vue';
+import { ref, reactive, onMounted } from 'vue'
+import axios from 'axios'
+import { ElMessage } from 'element-plus'
+import { DataAnalysis, Calendar, UserFilled, TrendCharts, List, PieChart, Refresh } from '@element-plus/icons-vue'
 
-// --- 状态定义 ---
-const API_BASE = "http://127.0.0.1:8000";
-const logs = ref([]);
-const userList = ref([]); // 用户下拉列表
-const total = ref(0);
-const loading = ref(false);
-const currentPage = ref(1);
-const pageSize = ref(10);
-const selectedUser = ref(''); // 当前筛选的用户名
+const API_BASE = 'http://127.0.0.1:8000'
 
-// --- API 请求 ---
+const logs = ref([])
+const userList = ref([])
+const total = ref(0)
+const loading = ref(false)
+const currentPage = ref(1)
+const pageSize = ref(10)
+const selectedUser = ref('')
+const selectedEmotion = ref('')
+const daysFilter = ref('7')
 
-/* 1. 获取所有用户列表 (用于筛选) */
+const stats = reactive({
+  total_count: 0, today_count: 0, active_users: 0,
+  avg_mood: 0, dominant_emotion: '', emotion_distribution: []
+})
+
+const emotions = [
+  { label: '😊 开心', value: 'happy' }, { label: '😢 难过', value: 'sad' },
+  { label: '😡 愤怒', value: 'angry' }, { label: '😐 平静', value: 'neutral' },
+  { label: '😨 恐惧', value: 'fear' }, { label: '😲 惊讶', value: 'surprise' }
+]
+
 const fetchUserList = async () => {
   try {
-    const res = await axios.get(`${API_BASE}/api/admin/users`);
-    userList.value = res.data;
-  } catch (err) {
-    console.error('获取用户列表失败', err);
-  }
-};
+    const res = await axios.get(`${API_BASE}/api/admin/users`)
+    userList.value = res.data.users || []
+  } catch { /* ignore */ }
+}
 
-/* 2. 获取日志数据 (支持分页和筛选) */
 const fetchLogs = async (page = 1) => {
-  loading.value = true;
+  loading.value = true
   try {
     const res = await axios.get(`${API_BASE}/api/admin/logs`, {
-      params: { 
-        page: page,
-        page_size: pageSize.value,
-        username: selectedUser.value // 传空字符串则显示所有注册用户
+      params: {
+        page, page_size: pageSize.value,
+        username: selectedUser.value || undefined,
+        emotion: selectedEmotion.value || undefined,
+        days: daysFilter.value || undefined
       }
-    });
-    logs.value = res.data.data || [];
-    total.value = res.data.total || 0;
-    currentPage.value = page;
-  } catch (err) {
-    ElMessage.error('无法加载日志数据');
-  } finally {
-    loading.value = false;
-  }
-};
+    })
+    logs.value = res.data.data || []
+    total.value = res.data.total || 0
+    currentPage.value = page
+  } catch { ElMessage.error('加载日志失败') }
+  finally { loading.value = false }
+}
 
-// --- 事件处理 ---
+const fetchStats = async () => {
+  try {
+    const res = await axios.get(`${API_BASE}/api/admin/logs/stats`, {
+      params: {
+        username: selectedUser.value || undefined,
+        days: daysFilter.value || undefined
+      }
+    })
+    Object.assign(stats, res.data)
+  } catch { /* ignore */ }
+}
 
-const handleFilterChange = () => {
-  // 筛选条件变化时，重置到第一页
-  fetchLogs(1);
-};
+const onFilterChange = () => { fetchLogs(1); fetchStats() }
+const refreshData = () => { fetchLogs(currentPage.value); fetchStats(); ElMessage.success('已刷新') }
 
-const handlePageChange = (page) => {
-  fetchLogs(page);
-};
+const formatTime = ts => ts ? ts.replace('T', ' ').substring(0, 19) : ''
 
-const refreshData = () => {
-  fetchLogs(currentPage.value);
-  ElMessage.success('数据已刷新');
-};
+const getEmoji = m => ({ happy:'😊', sad:'😢', angry:'😡', neutral:'😐', fear:'😨', surprise:'😲' })[m?.toLowerCase()] || '😶'
+const emotionLabel = m => ({ happy:'开心', sad:'难过', angry:'愤怒', neutral:'平静', fear:'恐惧', surprise:'惊讶' })[m?.toLowerCase()] || m || '--'
+const emotionColor = m => ({ happy:'#67c23a', sad:'#409eff', angry:'#f56c6c', neutral:'#909399', fear:'#e6a23c', surprise:'#9b59b6' })[m?.toLowerCase()] || '#909399'
+const emotionColorBg = m => ({ happy:'#f0f9eb', sad:'#ecf5ff', angry:'#fef0f0', neutral:'#f4f4f5', fear:'#fdf6ec', surprise:'#f3e8ff' })[m?.toLowerCase()] || '#f4f4f5'
 
-// --- 视觉辅助函数 ---
+const scorePercent = s => Math.round((s || 0) * 100)
+const scoreColor = s => s > 0.8 ? '#67c23a' : s > 0.5 ? '#e6a23c' : '#909399'
 
-const formatTime = (ts) => {
-  if (!ts) return '';
-  return ts.replace('T', ' ').substring(0, 19);
-};
+const distMax = () => Math.max(...(stats.emotion_distribution || []).map(d => d.count), 1)
+const distPercent = count => Math.round((count / distMax()) * 100)
 
-const getEmoji = (m) => {
-  const map = { happy: '😊', sad: '😢', angry: '😡', neutral: '😐', fear: '😨', surprise: '😲' };
-  return map[m?.toLowerCase()] || '😶';
-};
+const stringToColor = str => {
+  let hash = 0
+  for (let i = 0; i < str.length; i++) hash = str.charCodeAt(i) + ((hash << 5) - hash)
+  return '#' + ('00000' + (hash & 0x00FFFFFF).toString(16)).slice(-6)
+}
 
-const getEmotionType = (emotion) => {
-  const map = {
-    'happy': 'success', 'sad': 'primary', 'angry': 'danger', 
-    'neutral': 'info', 'surprise': 'warning', 'fear': 'danger'
-  };
-  return map[emotion?.toLowerCase()] || 'info';
-};
-
-const getScoreColor = (score) => {
-  // 强度越高颜色越深/越明显
-  if (score > 0.8) return '#67C23A'; // 高置信度 - 绿
-  if (score > 0.5) return '#E6A23C'; // 中置信度 - 黄
-  return '#909399';                  // 低置信度 - 灰
-};
-
-// 根据用户名生成一个固定的背景色，让头像更好看
-const stringToColor = (str) => {
-  let hash = 0;
-  for (let i = 0; i < str.length; i++) {
-    hash = str.charCodeAt(i) + ((hash << 5) - hash);
-  }
-  const c = (hash & 0x00FFFFFF).toString(16).toUpperCase();
-  return '#' + '00000'.substring(0, 6 - c.length) + c;
-};
-
-// --- 生命周期 ---
 onMounted(() => {
-  fetchUserList();
-  fetchLogs(1);
-});
+  fetchUserList()
+  fetchLogs(1)
+  fetchStats()
+})
 </script>
 
 <style scoped>
-.logs-container {
-  padding: 0;
-}
+.logs-page { padding: 0; }
 
-.logs-card {
-  border-radius: 8px;
+/* ===== 统计卡片 ===== */
+.stats-row {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+.stat-card {
+  flex: 1;
+  background: #fff;
+  border-radius: 12px;
+  padding: 18px 20px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  box-shadow: 0 1px 3px rgba(0,0,0,.06);
   border: 1px solid #ebeef5;
+  transition: transform .2s, box-shadow .2s;
 }
-
-/* 头部样式 */
-.header-box { 
-  display: flex; 
-  justify-content: space-between; 
-  align-items: center; 
+.stat-card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,.1); }
+.stat-icon {
+  width: 48px; height: 48px;
+  border-radius: 12px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 22px;
+  flex-shrink: 0;
 }
-.left-panel {
-  display: flex;
-  align-items: center;
-  gap: 8px;
+.big-emoji { font-size: 24px; line-height: 1; }
+.stat-value { font-size: 24px; font-weight: 700; color: #303133; line-height: 1.2; }
+.stat-label { font-size: 13px; color: #909399; margin-top: 2px; }
+
+/* ===== 内容行 ===== */
+.content-row { display: flex; gap: 20px; align-items: flex-start; }
+.table-panel { flex: 1; min-width: 0; }
+.side-panel { width: 260px; flex-shrink: 0; }
+
+/* ===== 面板 ===== */
+:deep(.el-card__header) { padding: 14px 20px; }
+.panel-header {
+  display: flex; justify-content: space-between; align-items: center;
+  flex-wrap: wrap; gap: 10px;
 }
-.icon-title { color: #409EFF; }
-.title { font-size: 16px; font-weight: bold; color: #303133; }
+.panel-title { font-size: 15px; font-weight: 600; color: #303133; display: flex; align-items: center; gap: 6px; }
+.filter-bar { display: flex; align-items: center; gap: 8px; }
 
-/* 筛选区 */
-.filter-box { display: flex; align-items: center; }
-.label { font-size: 14px; color: #606266; margin-right: 10px; }
-.ml-2 { margin-left: 10px; }
+/* ===== 表格 ===== */
+.time-text { font-family: monospace; color: #606266; font-size: 13px; }
+.user-chip { display: flex; align-items: center; gap: 6px; font-weight: 500; }
+.user-avatar-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.emotion-tag { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 12px; font-weight: 500; }
+.score-cell { display: flex; align-items: center; gap: 10px; }
+.score-num { font-size: 12px; color: #909399; min-width: 36px; }
 
-/* 表格内容样式 */
-.time-cell {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  color: #606266;
-  font-family: monospace; /* 等宽字体显示时间更好看 */
-}
+/* ===== 分页 ===== */
+.pagination-wrap { margin-top: 16px; display: flex; justify-content: flex-end; }
 
-.user-cell { display: flex; align-items: center; }
-.username { font-weight: 600; color: #303133; }
-
-.emoji { margin-right: 4px; font-size: 14px; }
-
-.score-wrapper {
-  max-width: 250px;
-}
-
-/* 分页 */
-.pagination-container { 
-  margin-top: 25px; 
-  display: flex; 
-  justify-content: flex-end; 
-  padding-right: 10px;
-}
+/* ===== 情绪分布 ===== */
+.dist-list { display: flex; flex-direction: column; gap: 14px; }
+.dist-item { }
+.dist-header { display: flex; justify-content: space-between; font-size: 13px; color: #606266; margin-bottom: 4px; }
+.dist-count { font-weight: 600; color: #303133; }
+.dist-bar-track { height: 8px; border-radius: 4px; background: #f0f0f0; overflow: hidden; }
+.dist-bar-fill { height: 100%; border-radius: 4px; transition: width .4s ease; }
+.empty-dist { text-align: center; color: #909399; padding: 30px 0; font-size: 13px; }
 </style>
