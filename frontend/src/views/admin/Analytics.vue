@@ -54,7 +54,7 @@ const comprehensiveReport = ref(null);
 
 // 模块 1：高危预警台数据
 const alertFeed = ref([]);
-const alertLimit = ref(3);
+const alertLimit = ref(50);
 const alertDateRange = ref([]);
 const alertTotal = ref(0);
 
@@ -589,7 +589,7 @@ onUnmounted(() => {
                 style="width: 280px"
                 @change="onAlertFilterChange"
               />
-              <span class="filter-hint">显示最近 {{ alertLimit }} 条</span>
+              <span class="filter-hint">最多显示 {{ alertLimit }} 条</span>
             </div>
 
             <div class="alert-feed">
