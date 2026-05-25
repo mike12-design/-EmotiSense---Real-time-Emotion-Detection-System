@@ -18,7 +18,11 @@
       
       <!-- 图表容器 -->
       <div v-loading="chartLoading">
-        <div ref="trendChartRef" style="height: 350px; width: 100%;"></div>
+        <div v-if="chartEmpty" class="chart-empty">
+          <span class="empty-emoji">📊</span>
+          <p>{{ timeRange === 'day' ? '今日' : timeRange === 'week' ? '本周' : '本月' }}暂无情绪数据</p>
+        </div>
+        <div v-else ref="trendChartRef" style="height: 350px; width: 100%;"></div>
       </div>
     </el-card>
 
@@ -73,8 +77,9 @@ import * as echarts from 'echarts';
 import { TrendCharts } from '@element-plus/icons-vue';
 
 const username = localStorage.getItem('user') || 'admin';
-const timeRange = ref('day');
+const timeRange = ref('week');
 const chartLoading = ref(false);
+const chartEmpty = ref(false);
 const trendChartRef = ref(null);
 let myChart = null;
 
@@ -168,13 +173,20 @@ const initChart = (data) => {
 
 const fetchChartData = async () => {
   chartLoading.value = true;
+  chartEmpty.value = false;
   try {
     const res = await axios.get(`http://127.0.0.1:8000/api/my/history/stats`, {
       params: { username: username, range_type: timeRange.value }
     });
-    initChart(res.data);
+    if (!res.data.labels || res.data.labels.length === 0) {
+      chartEmpty.value = true;
+      if (myChart) { myChart.dispose(); myChart = null; }
+    } else {
+      initChart(res.data);
+    }
   } catch (e) {
     console.error("图表数据获取失败", e);
+    chartEmpty.value = true;
   } finally {
     chartLoading.value = false;
   }
@@ -231,4 +243,19 @@ onUnmounted(() => {
 .mt-4 { margin-top: 1rem; }
 .p-4 { padding: 1rem; }
 .mb-6 { margin-bottom: 1.5rem; }
+
+.chart-empty {
+  height: 350px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: #94a3b8;
+  font-size: 14px;
+}
+.empty-emoji {
+  font-size: 48px;
+  margin-bottom: 12px;
+  opacity: 0.5;
+}
 </style>
