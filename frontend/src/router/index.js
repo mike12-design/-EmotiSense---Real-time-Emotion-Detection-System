@@ -65,7 +65,13 @@ const router = createRouter({
 
 // --- 路由守卫 ---
 router.beforeEach((to, from, next) => {
-  const role = localStorage.getItem('role'); 
+  const role = localStorage.getItem('role');
+
+  // 管理员禁止访问监控页面，重定向到用户管理
+  if (role === 'admin' && to.path === '/') {
+    next('/admin/users');
+    return;
+  }
 
   if (to.matched.some(record => record.meta.requiresAuth)) {
     if (!role) {

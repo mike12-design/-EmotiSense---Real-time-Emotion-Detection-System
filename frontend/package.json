@@ -9,18 +9,21 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test:e2e": "NODE_PATH=./node_modules playwright test"
   },
   "dependencies": {
     "@element-plus/icons-vue": "^2.3.2",
     "axios": "^1.13.4",
     "echarts": "^6.0.0",
     "element-plus": "^2.13.2",
+    "pinia": "^3.0.4",
     "screenfull": "^6.0.2",
     "vue": "^3.5.26",
     "vue-router": "^5.0.2"
   },
   "devDependencies": {
+    "@playwright/test": "^1.59.1",
     "@vitejs/plugin-vue": "^6.0.3",
     "vite": "^7.3.0",
     "vite-plugin-vue-devtools": "^8.0.5"

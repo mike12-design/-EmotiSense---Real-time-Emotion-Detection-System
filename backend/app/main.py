@@ -50,6 +50,13 @@ async def lifespan(app: FastAPI):
     logger.info("👋 [Shutdown] 正在关闭服务并释放资源...")
     if api_module.audio_manager:
         api_module.audio_manager.stop()
+    # 释放摄像头硬件
+    if api_module.video_cap is not None:
+        try:
+            api_module.video_cap.release()
+        except Exception:
+            pass
+        api_module.video_cap = None
     logger.info("✅ 服务已安全停止")
 
 

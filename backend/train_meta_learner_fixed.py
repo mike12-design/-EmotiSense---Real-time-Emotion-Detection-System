@@ -92,7 +92,7 @@ class ImprovedMetaLearnerTrainer:
 
         # 初始化眼睛特征提取器（统一的提取方式）
         try:
-            from eye_feature_extractor import EyeFeatureExtractor
+            from core.eye_feature_extractor import EyeFeatureExtractor
             self.eye_extractor = EyeFeatureExtractor(device=str(self.device))
             logger.info("✅ 眼睛特征提取器加载成功")
         except ImportError:

@@ -2,86 +2,60 @@
 import time
 from collections import deque
 
+NEGATIVE_EMOTIONS = {"sad", "angry", "fear", "disgust"}
+
 class EmotionDynamicsEngine:
-    """
-    Emotional Dynamics Engine
-    模拟情绪随时间演化，并增加兼容 API 调用所需的属性
-    """
+    """情绪动力学引擎 — 基于稳定器输出的滑动窗口投票触发干预"""
 
     def __init__(self):
-        # EMA 情绪值（-1 ~ 1）
-        self.valence_ema = 0.0
-        # 压力累积
-        self.distress = 0.0
-        # 历史窗口
-        self.history = deque(maxlen=30)
-        # 上次干预时间
-        self.last_intervention = 0
-
-        # --- 新增：用于兼容 api.py 调用的属性 ---
         self.primary_emotion = "neutral"
         self.mood_score = 0.0
         self.stress_level = 0.0
-        self.trigger_intervention = False # 是否触发了干预
+        self.trigger_intervention = False
 
-        # 参数
-        self.ALPHA = 0.2
-        self.DECAY = 0.95
-        self.TRIGGER_THRESHOLD = 1.2
-        self.COOLDOWN = 60
+        # 滑动窗口：记录稳定器每次输出的情绪
+        self.window = deque(maxlen=20)   # 约 100 秒
+        self.last_intervention = 0
+
+        # 可调参数
+        self.WINDOW_SIZE = 20
+        self.NEGATIVE_RATIO = 0.7
+        self.COOLDOWN = 120
 
     def valence_map(self, emotion):
         mapping = {
-            "happy": 1.0,
-            "surprise": 0.3,
-            "neutral": 0.0,
-            "sad": -0.6,
-            "fear": -0.8,
-            "angry": -1.0,
-            "disgust": -0.9,
-            "contempt": -0.7
+            "happy": 1.0, "surprise": 0.3, "neutral": 0.0,
+            "sad": -0.6, "fear": -0.8, "angry": -1.0, "disgust": -0.9,
         }
         return mapping.get(emotion.lower(), 0.0)
 
     def update(self, emotion, confidence):
-        """
-        更新情绪动力学状态
-        """
         now = time.time()
-        self.primary_emotion = emotion # 记录当前情绪
+        self.primary_emotion = emotion
 
-        # 计算当前的效价权重
+        # 更新效价和压力（保留给前端显示用）
         v = self.valence_map(emotion) * confidence
+        self.mood_score = self.mood_score * 0.8 + v * 0.2
+        self.stress_level = 1.0 if self.mood_score < 0 else max(0, self.stress_level * 0.9)
 
-        # EMA 更新
-        self.valence_ema = self.ALPHA * v + (1 - self.ALPHA) * self.valence_ema
+        # 滑动窗口投票
+        self.window.append(emotion.lower())
 
-        # 压力累积逻辑
-        if self.valence_ema < 0:
-            self.distress = self.distress * self.DECAY + abs(self.valence_ema)
-        else:
-            self.distress *= self.DECAY
-
-        self.history.append(self.valence_ema)
-
-        # 更新映射属性供外部访问
-        self.mood_score = self.valence_ema
-        self.stress_level = self.distress
-
-        # 干预判断逻辑
+        # 判断触发
         self.trigger_intervention = False
-        if now - self.last_intervention > self.COOLDOWN:
-            if self.distress > self.TRIGGER_THRESHOLD:
+        if len(self.window) >= self.WINDOW_SIZE and now - self.last_intervention > self.COOLDOWN:
+            negative_count = sum(1 for e in self.window if e in NEGATIVE_EMOTIONS)
+            ratio = negative_count / len(self.window)
+            if ratio >= self.NEGATIVE_RATIO:
                 self.last_intervention = now
-                self.distress *= 0.5
+                self.window.clear()
                 self.trigger_intervention = True
 
-        # 💡 关键修改：返回 self 确保 api.py 中的 dyn.primary_emotion 不报错
         return self
 
     def get_state(self):
         return {
-            "valence": round(self.valence_ema, 3),
-            "distress": round(self.distress, 3),
-            "primary_emotion": self.primary_emotion
+            "valence": round(self.mood_score, 3),
+            "distress": round(self.stress_level, 3),
+            "primary_emotion": self.primary_emotion,
         }

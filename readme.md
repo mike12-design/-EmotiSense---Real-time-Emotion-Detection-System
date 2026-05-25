@@ -1,768 +1,950 @@
+# EmotiSense: Real-time Emotion Detection System with Multi-Model Fusion and Intelligent Intervention
 
-# EmotiSense - Real-time Emotion Detection System
+> A multi-modal, real-time emotion recognition and monitoring system that integrates computer vision, affective computing, and intelligent intervention into a unified web-based platform.
 
-A multimodal emotion recognition system based on computer vision and deep learning, capable of real-time facial emotion analysis and providing intervention feedback such as music and voice.
+---
 
-## Project Architecture
+## Abstract
+
+EmotiSense is a full-stack emotion detection system capable of real-time facial emotion analysis through webcam input. The system employs a hierarchical multi-model fusion architecture combining global face emotion classifiers (DeepFace, HSEmotion, FER) with a specialized eye-region CNN for enhanced sad/neutral discrimination. An Emotion Dynamics Engine models emotional state as a continuous valence trajectory with stress accumulation, while an Advanced Analytics module implements attractor models, RMSSD fluctuation quantification, Kalman filter smoothing, and diary-visual consistency validation. The system automatically triggers context-aware interventions (music, TTS voice comfort, hitokoto quotes) and provides comprehensive user/admin dashboards with ECharts visualizations.
+
+---
+
+## Table of Contents
+
+- [System Architecture](#1-system-architecture)
+- [Processing Pipeline](#2-processing-pipeline)
+- [Multi-Model Fusion](#3-multi-model-fusion)
+- [Emotion Dynamics Engine](#4-emotion-dynamics-engine)
+- [Advanced Analytics](#5-advanced-analytics)
+- [Intervention System](#6-intervention-system)
+- [Explainable AI (XAI)](#7-explainable-ai-xai)
+- [Database Schema](#8-database-schema)
+- [API Reference](#9-api-reference)
+- [Frontend Architecture](#10-frontend-architecture)
+- [Installation](#11-installation)
+- [Training & Evaluation](#12-training--evaluation)
+- [Configuration](#13-configuration)
+- [Model Zoo](#14-model-zoo)
+- [Experimental Results](#15-experimental-results)
+- [Dataset](#16-dataset)
+- [Academic References](#17-academic-references)
+
+---
+
+## 1. System Architecture
+
+```
++====================================================================+
+|                        Frontend (Vue 3 + Vite)                      |
+|                                                                    |
+|  +---------------+ +---------------+ +---------------+             |
+|  | MonitorMode   | | User Dashboard| | Admin Panel   |             |
+|  | (MJPEG Stream)| | (History/Stats)| | (Analytics)  |             |
+|  +---------------+ +---------------+ +---------------+             |
+|  +---------------+ +---------------+ +---------------+             |
+|  | Diary System  | | Calendar Mood | | Resource Mgmt |             |
+|  | (CRUD + Tags) | | (Face+Diary)  | | (Music/Script)|             |
+|  +---------------+ +---------------+ +---------------+             |
+|                                                                    |
+|  Tech: Vue 3 (Composition API) | Element Plus | ECharts | Axios    |
++================================|===================================+
+                                 | HTTP REST API
++================================|===================================+
+|                     Backend (FastAPI + Uvicorn)                     |
+|                                                                    |
+|  +----------------------------------------------------------------+|
+|  |  API Layer (app/api.py) -- ~50 endpoints across 6 namespaces  ||
+|  |  /video_feed | /api/status | /api/my/* | /api/admin/*         ||
+|  +----------------------------------------------------------------+|
+|                                                                    |
+|  +----------------------------------------------------------------+|
+|  |  Core Processing Pipeline (real-time, per-frame)               ||
+|  |                                                                ||
+|  |  Camera --> FaceDetector --> EmotionDetector --> Stabilizer   ||
+|  |    (OpenCV)    (YOLOv8)     (Fusion/DeepFace)  (Window Vote)  ||
+|  |                              |                                 ||
+|  |                        DynamicsEngine                          ||
+|  |                        (EMA Valence + Distress)                ||
+|  |                              |                                 ||
+|  |                        EmotionLog (throttled)                  ||
+|  |                              |                                 ||
+|  |                        Intervention Decision                   ||
+|  +----------------------------------------------------------------+|
+|                                                                    |
+|  +----------------------------------------------------------------+|
+|  |  Advanced Analytics Engine (post-hoc, per-user)                ||
+|  |  - Attractor Model (personalized emotional baseline)           ||
+|  |  - RMSSD (emotion fluctuation index, borrowed from HRV)        ||
+|  |  - Kalman Filter (1D, mood trajectory smoothing)               ||
+|  |  - Emotion Inertia (lag-1 autocorrelation)                     ||
+|  |  - Diary-Visual Consistency Validation (closed-loop)           ||
+|  +----------------------------------------------------------------+|
+|                                                                    |
+|  +----------------------------------------------------------------+|
+|  |  Audio Intervention System                                     ||
+|  |  - Music: pygame mixer, emotion-tagged, user-specific          ||
+|  |  - TTS: edge-tts (zh-CN-XiaoxiaoNeural) with volume ducking   ||
+|  |  - Scripts: comfort message library, global + per-user         ||
+|  +----------------------------------------------------------------+|
+|                                                                    |
+|  Data: SQLite (SQLAlchemy ORM)                                     |
++====================================================================+
+```
+
+### Directory Structure
 
 ```
 EmotiSense/
-├── backend/           # FastAPI Backend Service
-│   ├── app/          # API Routes and Application Logic
-│   ├── core/         # Core Detection Algorithms
-│   ├── models/       # Pre-trained Emotion Models
-│   ├── weights/      # Model Weight Files
-│   └── config.yaml   # Configuration File
-├── frontend/         # Vue 3 Frontend Application
+├── backend/
+│   ├── app/
+│   │   ├── main.py             # FastAPI app with lifespan management
+│   │   ├── api.py              # All ~50 API endpoints (monolithic router)
+│   │   └── database.py         # SQLAlchemy engine + SessionLocal
+│   ├── core/
+│   │   ├── config.py           # YAML configuration loader (singleton)
+│   │   ├── models.py           # ORM models (6 tables)
+│   │   ├── detector.py         # FaceDetector + EmotionDetector + find_identity
+│   │   ├── stabilizer.py       # EmotionStabilizer (sliding window vote)
+│   │   ├── emotion_dynamics.py # EmotionDynamicsEngine (EMA + distress)
+│   │   ├── audio_manager.py    # AudioManager (pygame + edge-tts)
+│   │   ├── advanced_analyzer.py   # AdvancedEmotionAnalyzer + DiarySentimentAnalyzer
+│   │   ├── advanced_detectors.py  # HSEmotionDetector, FERDetector, EyeFusionDetector, EnsembleDetector
+│   │   ├── decision_fusion_detector.py  # ImprovedDecisionFusionDetector (gated routing)
+│   │   ├── meta_learner_inference.py    # MetaLearnerPrediction (feature extraction + inference)
+│   │   ├── eye_feature_extractor.py     # EyeFeatureExtractor (unified extraction)
+│   │   └── eye_fusion_detector.py       # EyeFusionDetectorFixed (rule-based fusion)
+│   ├── train_meta_learner.py   # Meta-learner training script (Stacking)
+│   ├── train_meta_learner_fixed.py
+│   ├── evaluate_meta_learner.py
+│   ├── evaluate_all_models.py
+│   ├── finetune_eye_model.py
+│   ├── config.yaml             # Centralized configuration
+│   ├── models/                 # Pre-trained ML models
+│   ├── weights/                # Trained weights (meta-learner, eye model, etc.)
+│   └── assets/                 # Static files (music, backgrounds, TTS output)
+├── frontend/
 │   ├── src/
-│   │   ├── views/    # Page Components
-│   │   ├── layouts/  # Layout Components
-│   │   └── assets/   # Static Assets
-│   └── dist/         # Build Output
-└── weights/          # Additional Model Weights
+│   │   ├── main.js             # App entry (Vue + Element Plus + icons)
+│   │   ├── App.vue             # Root (background management)
+│   │   ├── router/index.js     # Vue Router with role-based guards
+│   │   ├── layouts/            # AdminLayout.vue, UserLayout.vue
+│   │   ├── views/
+│   │   │   ├── Login.vue
+│   │   │   ├── user/           # MonitorMode, UserHome, UserHistory, UserDiary, UserSettings
+│   │   │   └── admin/          # UserManager, ResourceManager, Analytics, SystemLogs
+│   │   └── styles/             # theme.css (design tokens)
+│   └── package.json
+└── CLAUDE.md
 ```
 
-## Core Features
+---
+
+## 2. Processing Pipeline
+
+The core processing pipeline executes on every video frame (or every Nth frame based on `frame_skip`):
+
+```
+┌──────────────────────────────────────────────────────────────────────┐
+│                         Frame Processing Loop                         │
+└──────────────────────────────────┬───────────────────────────────────┘
+                                   │
+        ┌──────────────────────────▼──────────────────────────┐
+        │  1. Capture Raw Frame (OpenCV VideoCapture)          │
+        │     - BGR format, 640x360, 30fps                     │
+        └──────────────────────────┬──────────────────────────┘
+                                   │
+        ┌──────────────────────────▼──────────────────────────┐
+        │  2. Face Detection (YOLOv8 + Haar Cascade)           │
+        │     - YOLOv8 detects face bounding boxes             │
+        │     - Haar Cascade detects eyes within upper 60% ROI │
+        │     - EMA smoothing on face bounding box             │
+        │     - Returns: rect, has_eyes, eye_coords            │
+        └──────────────────────────┬──────────────────────────┘
+                                   │
+        ┌──────────────────────────▼──────────────────────────┐
+        │  3. Emotion Analysis (Configurable Detector)         │
+        │     - Adaptive call via inspect.signature:           │
+        │       * Full frame + face_rect -> Fusion detectors   │
+        │       * Cropped face_img -> DeepFace/HSEmotion       │
+        │     - Returns: (emotion_name, confidence_percentage) │
+        └──────────────────────────┬──────────────────────────┘
+                                   │
+        ┌──────────────────────────▼──────────────────────────┐
+        │  4. Confidence-Based Dynamic Weighting               │
+        │     - Eye-dependent emotions (surprise, fear, sad):  │
+        │       * Eyes visible: confidence *= 1.15             │
+        │       * Eyes missing: confidence *= 0.80             │
+        │     - Mouth-dependent emotions (happy, angry):       │
+        │       No adjustment                                  │
+        └──────────────────────────┬──────────────────────────┘
+                                   │
+        ┌──────────────────────────▼──────────────────────────┐
+        │  5. Identity Recognition (Optional)                  │
+        │     - DeepFace VGG-Face embedding extraction         │
+        │     - Cosine distance comparison (threshold = 0.6)   │
+        │     - Face DB cached every 10 seconds                │
+        └──────────────────────────┬──────────────────────────┘
+                                   │
+        ┌──────────────────────────▼──────────────────────────┐
+        │  6. XAI Visual Overlays (Optional)                   │
+        │     - Blue overlay on eye regions (eye-dependent)    │
+        │     - Red overlay on mouth region (mouth-dependent)  │
+        │     - Label: "XAI: Eye/Mouth Region Activation"      │
+        │     - Top label: Name | Emotion | Confidence%        │
+        └──────────────────────────┬──────────────────────────┘
+                                   │
+        ┌──────────────────────────▼──────────────────────────┐
+        │  7. Encode to JPEG + Return to Frontend              │
+        │     - MJPEG stream via multipart/x-mixed-replace     │
+        └──────────────────────────┬──────────────────────────┘
+                                   │
+        ┌──────────────────────────▼──────────────────────────┐
+        │  8. Emotion Stabilizer (if faces detected)           │
+        │     - Add prediction to sliding window (size=15)     │
+        │     - Majority vote with 60% hysteresis threshold    │
+        │     - Returns stable emotion                         │
+        └──────────────────────────┬──────────────────────────┘
+                                   │
+        ┌──────────────────────────▼──────────────────────────┐
+        │  9. Emotion Dynamics Engine                          │
+        │     - EMA valence update (alpha=0.2)                 │
+        │     - Distress accumulation/decay (decay=0.95)       │
+        │     - Intervention trigger check (threshold=1.2)     │
+        │     - 60s cooldown between interventions             │
+        └──────────────────────────┬──────────────────────────┘
+                                   │
+        ┌──────────────────────────▼──────────────────────────┐
+        │  10. Database Log (Throttled)                        │
+        │      - Only if emotion persisted > 3s                │
+        │      - Only if > 5s since last write                 │
+        │      - Stores: timestamp, user_id, emotion, score    │
+        └─────────────────────────────────────────────────────┘
+```
+
+---
+
+## 3. Multi-Model Fusion
+
+### 3.1 Available Detection Backends
+
+EmotiSense implements **7 emotion detection backends** with a factory pattern for easy switching via `config.yaml`:
+
+| Detector | Architecture | Emotion Classes | Speed | Notes |
+|----------|-------------|-----------------|-------|-------|
+| `deepface` | VGG-Face CNN | 7 | ~200ms | Default, stable and reliable |
+| `hsemotion` | EfficientNet-B0 | 7 or 8 | ~60ms | High-speed, best accuracy |
+| `fer` | Custom CNN | 7 | ~150ms | Lightweight FER library |
+| `ensemble` | Weighted average | 7 | ~250ms | Combines multiple detectors |
+| `eye_fusion` | Eye CNN + global features | 3 | ~100ms | Feature-level fusion for sad/neutral |
+| `decision_fusion` | Gated routing + weighted fusion | 7 | ~100ms | Decision-level fusion with gating |
+| `meta_learner` | Stacking classifier (sklearn) | 2 | ~50ms | Data-driven fusion, requires training |
+
+### 3.2 Detector Factory
+
+```python
+# backend/core/detector.py
+def create_emotion_detector(config: Config, use_meta_learner: Optional[bool] = None):
+    detector_type = config.get('emotion.detector_type', 'deepface')
+
+    if detector_type == 'meta_learner':
+        # Auto-uses decision_fusion with use_meta_learner=True
+        return create_improved_decision_fusion_detector(config, use_meta_learner=True)
+
+    if detector_type == 'decision_fusion':
+        use_meta_learner = use_meta_learner or config.get('emotion.use_meta_learner', False)
+        return create_improved_decision_fusion_detector(config, use_meta_learner=use_meta_learner)
+
+    # ... other detectors
+```
+
+### 3.3 Face Detection
+
+**Primary**: YOLOv8 with custom fine-tuned model (`yolov8m-face-lindevs.pt`) trained specifically for face detection.
+
+**Fallback**: Standard `yolov8n.pt` (person detection, class 0) if custom model is unavailable.
+
+**Bounding Box Smoothing**: Exponential Moving Average (EMA) to reduce video jitter:
+```
+smooth_x = last_x * (1 - smoothing_factor) + x * smoothing_factor
+```
+where `smoothing_factor = 0.3`.
+
+**Eye Detection**: Haar Cascade (`haarcascade_eye.xml`) within the upper 60% of the face ROI to avoid misclassifying mouths as eyes. Parameters: `scaleFactor=1.1`, `minNeighbors=4`, `minSize=(20,20)`.
+
+### 3.4 Identity Recognition
+
+DeepFace VGG-Face embeddings with cosine distance matching:
+
+1. Extract embedding from detected face using `DeepFace.represent()`
+2. Compare against cached face database (refreshed every 10 seconds)
+3. Cosine distance threshold: 0.6 (tuned for webcam conditions)
+4. Returns matched username or "Stranger"
+
+### 3.5 Stacking Meta-Learner
+
+The meta-learner implements **Stacking ensemble**, the industrial standard for model fusion:
+
+**Level 0 (Base Models):**
+- HSEmotion: produces 5-class soft probabilities `[P_sad, P_neutral, P_angry, P_happy, P_surprise]`
+- Eye CNN (ResNet18): produces `P_eye_sad`
+
+**Level 1 (Meta Classifier):**
+- 6D feature vector concatenation
+- Trained classifiers: Logistic Regression, SVM (RBF), Random Forest, Gradient Boosting
+- Best classifier selected by accuracy on stratified test set
+- Saved as `weights/meta_learner_fusion_model.pkl`
+
+**Gating Logic** in `ImprovedDecisionFusionDetector.analyze_emotion()`:
+
+1. **High Confidence Pass-Through** (>= 80%): Direct output, skip fusion
+2. **Iron Gate** (top emotion not in {sad, neutral}): Direct output, protect happy/angry/surprise
+3. **Conditional Activation** (top confidence > 55% AND sad/neutral < 25%): Direct output
+4. **Meta-Learner Decision**: 6D feature vector -> sklearn classifier -> sad/neutral prediction
+5. **Abstain Protection** (meta confidence < 55%): Fall back to global
+6. **Cross-Emotion Protection** (global says surprise, meta says neutral): Require meta confidence > 75% to override
+
+---
+
+## 4. Emotion Dynamics Engine
+
+The `EmotionDynamicsEngine` models emotion as a **continuous valence trajectory** rather than discrete classifications, implementing psychological theories of emotional inertia and mood dynamics.
+
+### 4.1 Valence Mapping
+
+Each discrete emotion maps to a continuous valence value based on psychological research:
+
+| Emotion | Valence | Interpretation |
+|---------|---------|---------------|
+| happy | +1.0 | Maximum positive affect |
+| surprise | +0.3 | Mildly positive (valence-ambiguous) |
+| neutral | 0.0 | Emotional baseline |
+| sad | -0.6 | Moderate negative affect |
+| contempt | -0.7 | Social-evaluative negative |
+| disgust | -0.9 | Strong rejection response |
+| fear | -0.8 | High-arousal negative |
+| angry | -1.0 | Maximum negative affect |
+
+### 4.2 EMA Update Rule
+
+```
+valence_ema(t) = ALPHA * (valence_map(emotion) * confidence) + (1 - ALPHA) * valence_ema(t-1)
+```
+
+ALPHA = 0.2: The system responds to new detections at 20% weight while maintaining 80% memory of historical mood, creating a smooth emotional trajectory.
+
+### 4.3 Distress Accumulation
+
+Stress (distress) accumulates during negative valence and decays during positive valence:
+
+```
+if valence_ema < 0:
+    distress(t) = distress(t-1) * DECAY + |valence_ema|
+else:
+    distress(t) = distress(t-1) * DECAY
+```
+
+DECAY = 0.95: Simulates natural emotional recovery -- stress slowly dissipates when not reinforced.
+
+### 4.4 Intervention Trigger
+
+```python
+if (time_now - last_intervention > COOLDOWN) and (distress > TRIGGER_THRESHOLD):
+    trigger_intervention = True
+    distress *= 0.5  # Post-intervention stress reduction
+    last_intervention = time_now
+```
+
+Parameters: TRIGGER_THRESHOLD = 1.2, COOLDOWN = 60 seconds.
+
+---
+
+## 5. Advanced Analytics
+
+### 5.1 Attractor Model
+
+Inspired by dynamical systems theory in psychology, each user has a personalized **emotion attractor** -- their baseline emotional equilibrium:
+
+- **Attractor (mean)**: `mean(valence_series)` -- the user's typical emotional valence
+- **Attractor std**: `std(valence_series)` -- individual variation range
+
+This enables detection of deviations relative to the user's own baseline rather than population averages.
+
+### 5.2 RMSSD (Root Mean Square of Successive Differences)
+
+Borrowed from Heart Rate Variability (HRV) analysis, RMSSD quantifies emotion fluctuation intensity:
+
+```
+RMSSD = sqrt(mean((v[i+1] - v[i])^2))
+```
+
+**Clinical Interpretation:**
+| RMSSD + Valence | Interpretation |
+|-----------------|---------------|
+| Low RMSSD (< 0.1) + Low valence (< -0.5) | Emotional rigidity / depressive state |
+| High RMSSD (> 0.5) | Extreme emotional volatility / anxiety |
+| Moderate RMSSD | Healthy emotional flexibility |
+
+**Sessioning Mechanism**: Only consecutive detections within 15 minutes are used for RMSSD calculation, preventing spurious fluctuation measurements across different contexts.
+
+### 5.3 Kalman Filter Smoothing
+
+A 1D Kalman filter extracts the "slow mood trajectory" from noisy momentary detections:
+
+- Process noise: Q = 0.01
+- Measurement noise: R = 0.1
+- Purpose: Separate genuine mood trends from transient expression noise (blinking, head turns, lighting changes)
+
+### 5.4 Emotion Inertia
+
+Computed as the lag-1 autocorrelation of the valence series, normalized to [0, 1]:
+
+```
+inertia = (autocorr + 1) / 2
+```
+
+High inertia (> 0.8) indicates the user tends to "get stuck" in an emotional state, resistant to change.
+
+### 5.5 Trend Direction
+
+Linear regression on the most recent N valence values:
+- `slope > 0.05`: rising
+- `slope < -0.05`: falling
+- otherwise: stable
+
+### 5.6 Diary-Visual Consistency Validation
+
+A closed-loop validation system compares subjective diary sentiment with objective visual recognition:
+
+1. **Diary Sentiment Analysis**: Bilingual (Chinese/English) sentiment lexicon matching
+   - Positive words: 开心, 快乐, happy, love, etc.
+   - Negative words: 难过, 悲伤, sad, angry, etc.
+
+2. **Temporal Matching**: Diary entries matched with visual emotion logs within a configurable tolerance window (default: 2 hours)
+
+3. **Correlation Analysis**: Pearson correlation coefficient between diary valence and matched visual valence
+
+4. **Consistency Classification:**
+   - High: r > 0.7 -- visual model is trustworthy
+   - Medium: r > 0.3 -- visual model is basically reliable
+   - Low: r < 0.3 -- visual model may have systematic bias
+
+5. **Extreme Asymmetry Detection:**
+   - **Masking detection**: visual valence < -0.5 (visibly distressed) AND diary valence > 0.2 (claims to be happy)
+   - **Severe conflict**: |visual - diary| > 0.7
+   - **Action**: Triggers `trigger_questionnaire` flag for PHQ-9 questionnaire
+
+---
+
+## 6. Intervention System
+
+### 6.1 Three-Tier Intervention Strategy
+
+| Risk Level | Trigger Condition | Intervention |
+|------------|-------------------|--------------|
+| **High** | RMSSD < 0.1 + valence < -0.3 sustained for N records | TTS urgency + calming music |
+| **Medium** | valence < -0.5 OR RMSSD > 0.4 | Music + hitokoto quotes |
+| **Low** | valence > 0.4 | Positive reinforcement |
+
+### 6.2 Music Intervention
+
+- **Engine**: pygame mixer with loop playback
+- **Library**: Emotion-tagged music with user-specific priority
+- **Retrieval**: User-exclusive music > Global music > Random selection
+- **Volume Management**: Automatically ducks to 10-20% during TTS speech
+
+### 6.3 TTS (Text-to-Speech) Comfort Voice
+
+- **Engine**: edge-tts with `zh-CN-XiaoxiaoNeural` voice
+- **Flow**: Generate MP3 -> pause background music -> play TTS -> resume music
+- **Coordination**: async/await with `asyncio.sleep(duration)` for proper timing
+
+### 6.4 Comfort Script Library
+
+- **Global scripts**: Shared by all users (initialized with 4 default messages)
+- **User-specific scripts**: Personalized messages per user
+- **Emotion tags**: sad, angry, happy, etc.
+- **Admin management**: Add/delete scripts via admin panel
+
+### 6.5 Hitokoto Integration
+
+Integration with [Hitokoto API](https://hitokoto.cn) for emotionally-contextual quotes:
+
+| Emotion | Category | Example Source |
+|---------|----------|---------------|
+| happy | literature + humor | 文学 + 抖机灵 |
+| sad | poetry + NetEase | 诗词 + 网易云 |
+| angry | philosophy | 哲学 |
+| neutral | anime + manga | 动画 + 漫画 |
+| fear | movies/TV | 影视 |
+| surprise | original | 原创 |
+
+2-second timeout ensures the third-party API doesn't slow down the system.
+
+---
+
+## 7. Explainable AI (XAI)
+
+### 7.1 Region-Based Visual Explanations
+
+The system provides visual overlays explaining which facial regions drove the emotion decision:
+
+- **Eye Region Activation** (blue overlay): Applied for surprise, fear, sad -- emotions where periorbital features are diagnostically important
+- **Mouth Region Activation** (red overlay): Applied for happy, angry -- emotions where mouth/lip features are key
+- Overlay transparency: 40% blend with original frame
+
+### 7.2 Confidence-Based Dynamic Weighting
+
+An implicit attention mechanism adjusts confidence based on feature availability:
+
+```python
+eye_dependent_emotions = ["surprise", "fear", "sad", "sadness"]
+mouth_dependent_emotions = ["happy", "angry", "disgust"]
+
+if base_emotion in eye_dependent_emotions:
+    if has_eyes:
+        final_confidence = min(100.0, base_confidence * 1.15)  # Boost
+    else:
+        final_confidence = base_confidence * 0.80  # Penalty
+```
+
+### 7.3 Identity Labels
+
+Each detected face displays: `Name | Emotion | Confidence%`
+- Green box for recognized users
+- Gray box for strangers
+
+---
+
+## 8. Database Schema
+
+SQLite database with 6 tables managed by SQLAlchemy ORM:
+
+### users
+| Column | Type | Description |
+|--------|------|-------------|
+| id | Integer (PK) | Auto-increment |
+| username | String (UNIQUE) | Login name |
+| password_hash | String | Password (plaintext, should be hashed) |
+| role | String | "admin" or "user" |
+| face_encoding | JSON | DeepFace VGG-Face embedding (list of floats) |
+| avatar | String | Avatar image path |
+| created_at | DateTime | Registration time |
+
+### emotion_logs
+| Column | Type | Description |
+|--------|------|-------------|
+| id | Integer (PK) | Auto-increment |
+| timestamp | DateTime | Detection time |
+| user_id | Integer (FK -> users) | Associated user (nullable) |
+| is_stranger | Boolean | Whether the person is unrecognized |
+| emotion | String | Emotion label (happy, sad, etc.) |
+| score | Float | Normalized mood score (0-1) |
+
+### diaries
+| Column | Type | Description |
+|--------|------|-------------|
+| id | Integer (PK) | Auto-increment |
+| user_id | Integer (FK -> users) | Author |
+| title | String | Diary title |
+| content | Text | Diary body text |
+| emotion | String | Self-reported mood |
+| timestamp | DateTime | Entry time (supports backdating) |
+
+### music_library
+| Column | Type | Description |
+|--------|------|-------------|
+| id | Integer (PK) | Auto-increment |
+| user_id | Integer (FK -> users, NULL=global) | Owner |
+| title | String | Display name |
+| filepath | String | Relative path to audio file |
+| emotion_tag | String | Associated emotion |
+| is_active | Boolean | Whether track is enabled |
+
+### comfort_scripts
+| Column | Type | Description |
+|--------|------|-------------|
+| id | Integer (PK) | Auto-increment |
+| user_id | Integer (FK -> users, NULL=global) | Owner |
+| content | Text | Comfort message text |
+| emotion_tag | String | Associated emotion |
+
+### system_events
+| Column | Type | Description |
+|--------|------|-------------|
+| id | Integer (PK) | Auto-increment |
+| timestamp | DateTime | Event time |
+| people_count | Integer | Number of people detected |
+| vote_result | JSON | Majority vote result (e.g., `{'sad':3, 'happy':1}`) |
+| final_mood | String | Aggregated mood |
+| action_type | String | "music", "tts", or "none" |
+| resource_id | Integer | Associated resource ID |
+
+---
+
+## 9. API Reference
+
+### Core Endpoints
+
+| Method | Path | Description | Auth |
+|--------|------|-------------|------|
+| GET | `/video_feed` | MJPEG real-time video stream | None |
+| GET | `/api/status` | Current emotion, mood_score, stress_level | None |
+| POST | `/analyze` | Single-frame image analysis | None |
+| POST | `/api/login` | Login (returns role + username) | None |
+| POST | `/api/register` | User registration | None |
+
+### User Endpoints (`/api/my/*`)
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/my/stats` | Personal emotion pie chart data |
+| GET | `/api/my/history` | Paginated emotion log history |
+| GET | `/api/my/history/stats` | Time-aggregated mood chart (day/week/month) |
+| GET | `/api/my/diaries` | User diary entries |
+| POST | `/api/my/diaries` | Create diary (with backdating support) |
+| PUT | `/api/my/diaries/:id` | Update diary |
+| DELETE | `/api/my/diaries/:id` | Delete diary |
+| GET | `/api/my/calendar_moods` | Calendar mood (face + diary merged, diary takes priority) |
+| GET | `/api/my/personalized_quote` | Emotion-targeted quote (hitokoto -> local script fallback) |
+| POST | `/api/user/upload_background` | Upload custom background |
+| DELETE | `/api/user/upload_background` | Reset background to default |
+| GET/POST/DELETE | `/api/user/scripts` | User-specific comfort scripts |
+| GET/POST/DELETE | `/api/user/music` | User-specific music library |
+| POST | `/api/user/upload_music` | Upload user-specific music |
+
+### Admin Endpoints (`/api/admin/*`)
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/admin/users` | List all users with face enrollment status |
+| POST | `/api/admin/capture_face/:user_id` | Capture face from webcam for enrollment |
+| GET | `/api/admin/logs` | System-wide emotion logs (paginated, filterable by username) |
+| GET | `/api/admin/analytics/stats` | Dashboard stats (overview, pie, trend, bar, heatmap, radar, top users) |
+| GET | `/api/admin/analytics` | Simple analytics (pie + trend, fallback) |
+| GET | `/api/admin/analytics/advanced/:user_id` | Advanced analytics (attractor, RMSSD, Kalman, trend, inertia, suggestions) |
+| GET | `/api/admin/analytics/comprehensive/:user_id` | AI diagnostic report (valence, RMSSD, risk level, conclusion, suggestions) |
+| GET | `/api/admin/analytics/alerts` | Real-time alert feed (intervention events + high-risk users) |
+| GET | `/api/admin/analytics/quadrant` | Valence x RMSSD scatter plot for all users |
+| POST | `/api/admin/analytics/diary/validate/:user_id` | Diary-visual consistency validation |
+| GET | `/api/admin/analytics/intervention/suggest/:user_id` | Intervention recommendations |
+| GET | `/api/admin/analytics/interventions/:user_id` | Intervention event timeline |
+| GET | `/api/admin/analytics/system-health` | AI system health (confidence distribution, emotion pie, accuracy) |
+| GET/POST/DELETE | `/api/admin/scripts` | Global comfort script management |
+| GET/POST/DELETE | `/api/admin/music` | Global music library management |
+
+### Debug Endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/debug/seed_data` | Generate 50 random emotion log entries |
+| GET | `/api/debug/create_test_user` | Create default admin (admin/123456) |
+
+---
+
+## 10. Frontend Architecture
+
+### Technology Stack
+- **Vue 3** with Composition API (`<script setup>`)
+- **Vue Router 5** with role-based navigation guards
+- **Element Plus** UI component library with custom theme CSS variables
+- **ECharts 6** for data visualization
+- **Axios** for HTTP communication
+- **Vite 7** for development and build
+- **screenfull** for fullscreen support
+
+### Route Structure
+
+```
+/                         -> MonitorMode (real-time webcam, public)
+/login                    -> Login page
+/admin (requires: admin)  -> AdminLayout
+  /admin/users            -> UserManager (CRUD + face capture)
+  /admin/resources        -> ResourceManager (music + scripts)
+  /admin/analytics        -> Analytics (dashboard with 7+ charts)
+  /admin/logs             -> SystemLogs (paginated log viewer)
+/user (requires: user)    -> UserLayout
+  /user/home              -> UserHome (daily quote, quick stats)
+  /user/history           -> UserHistory (emotion timeline)
+  /user/diary             -> UserDiary (CRUD + emotion tagging)
+  /user/settings          -> UserSettings (profile, background, music)
+```
+
+### Auth Model
+Simple role-based authentication using `localStorage`:
+- Keys: `user`, `role`
+- Route guards redirect unauthenticated users to `/login`
+- Role mismatch redirects to appropriate dashboard
+
+### Background System
+Priority-based background resolution:
+1. Custom background from `localStorage` (`custom_bg`)
+2. User-specific background from server (`/assets/bg_{username}.jpg`)
+3. Default soft gradient fallback
+
+### Theme System
+CSS custom properties in `styles/theme.css` for consistent design tokens (colors, border radii, shadows).
+
+---
+
+## 11. Installation
+
+### Prerequisites
+- Python 3.10+
+- Node.js 20.19+ or 22.12+
+- Webcam
+
+### Backend Setup
+
+```bash
+cd backend
+
+# Create and activate virtual environment
+python -m venv venv
+source venv/bin/activate  # macOS/Linux
+# venv\Scripts\activate   # Windows
+
+# Install core dependencies
+pip install fastapi uvicorn sqlalchemy opencv-python deepface ultralytics
+pip install pygame edge-tts pyyaml python-dotenv httpx
+pip install scikit-learn joblib numpy
+
+# Install optional dependencies (for advanced detectors)
+pip install torch torchvision  # Eye model + meta-learner
+pip install hsemotion          # HSEmotion detector (optional)
+pip install fer                # FER detector (optional)
+
+# Start the server
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+```
+
+API documentation available at `http://127.0.0.1:8000/docs`.
+
+### Frontend Setup
+
+```bash
+cd frontend
+
+# Install dependencies
+npm install
+
+# Start development server
+npm run dev
+
+# Build for production
+npm run build
+
+# Preview production build
+npm run preview
+```
+
+### First Run
+1. Start the backend server
+2. Create the default admin account: visit `http://127.0.0.1:8000/api/debug/create_test_user`
+3. Login with admin / 123456
+4. Enroll user faces via Admin -> Users -> Capture Face
+
+---
+
+## 12. Training & Evaluation
+
+### Meta-Learner Training
+
+```bash
+cd backend
+python train_meta_learner.py \
+  --dataset-path /path/to/dataset \
+  --samples-per-class 200 \
+  --output-path weights/meta_learner_fusion_model.pkl
+```
+
+**Training process:**
+1. Loads images from dataset directory (organized as `Angry/`, `Happy/`, `Neutral/`, `Sad/`, `Surprise/`)
+2. For each image: extracts 6D feature vector from HSEmotion + eye CNN
+3. Trains 4 classifiers (LR, SVM, RF, GBM) with stratified 80/20 split
+4. Selects best classifier by accuracy
+5. Saves model with feature names and classifier metadata
+
+### Model Evaluation
+
+```bash
+# Evaluate meta-learner on test set
+python evaluate_meta_learner.py
+
+# Compare all emotion models side by side
+python evaluate_all_models.py
+```
+
+### Eye Model Fine-Tuning
+
+```bash
+python finetune_eye_model.py
+```
+
+Fine-tunes a ResNet18 on eye region images for neutral vs sad binary classification.
+
+### Fixed Meta-Learner Training
+
+```bash
+python train_meta_learner_fixed.py
+```
+
+Fixed version of the meta-learner training script with improved feature extraction consistency.
+
+---
+
+## 13. Configuration
+
+All configuration is centralized in `backend/config.yaml`:
+
+### Video Capture
+```yaml
+video:
+  camera_index: 0          # Webcam device index
+  frame_width: 640         # Capture width
+  frame_height: 360        # Capture height
+  fps: 30                  # Target frame rate
+  frame_skip: 2            # Process every Nth frame
+```
+
+### Face Detection
+```yaml
+face_detection:
+  scale_factor: 1.1        # Haar cascade scale factor
+  min_neighbors: 3         # Minimum neighbors for face detection
+  min_size: [80, 80]       # Minimum face size
+  max_size: [300, 300]     # Maximum face size
+  smoothing_factor: 0.3    # EMA smoothing factor for bounding box
+```
 
 ### Emotion Detection
-- **Multi-Model Fusion**: Supports DeepFace, HSEmotion, FER and other emotion recognition models.
-- **Meta-Learner Fusion**: Decision-level fusion based on Stacking classifier for improved accuracy.
-- **Eye Micro-expression Analysis**: Independent eye region emotion detection for enhanced sadness and micro-expression recognition.
-- **Real-time Video Processing**: Real-time face detection and emotion analysis based on OpenCV.
+```yaml
+emotion:
+  detector_type: 'meta_learner'              # Backend selection
+  detection_interval: 3.0                    # Seconds between analyses
+  high_confidence_threshold: 95              # Percentage
+  anger_threshold: 50                        # Minimum angry confidence to report
+  max_data_records: 1000                     # Max emotion records in memory
+  decision_fusion_k: 0.5                     # Eye model weight in fusion (0.0-1.0)
+  use_meta_learner: true                     # Use trained LR vs rule-based fusion
+  sad_threshold: 30                          # Sad confidence threshold for eye model
+  hsemotion_model: 'enet_b0_8_best_afex'     # HSEmotion model variant
+  fer_use_mtcnn: false                       # Use MTCNN for FER (slower, more accurate)
+  eye_model_path: 'models/eye_model_finetuned.pth'
+```
 
-### User System
-- User registration/login with face recognition.
-- Personal emotion log recording.
-- Diary closed-loop feedback system.
+### Key Configuration Choices
 
-### Intervention System
-- **Music Playback**: Automatically plays corresponding music based on emotional state. Supports multi-file random play, user-exclusive music priority, and dynamic volume management.
-- **Voice Comfort**: Plays preset comfort scripts using Edge TTS (zh-CN-XiaoxiaoNeural) with automatic background music ducking.
-- **Kinetic Model**: Intervention decision algorithm based on emotional valence changes and fluctuation patterns.
+| `detector_type` | When to use |
+|-----------------|-------------|
+| `deepface` | Default, stable, no additional dependencies |
+| `hsemotion` | Best speed + accuracy, requires `hsemotion` package |
+| `meta_learner` | **Recommended**: Best sad/neutral discrimination |
+| `eye_fusion` | When eye model is available and well-trained |
+| `decision_fusion` | When you want rule-based fusion with configurable weights |
 
 ---
 
-### Music Intervention System
+## 14. Model Zoo
 
-#### Architecture
+| Model | File | Purpose | Framework |
+|-------|------|---------|-----------|
+| YOLOv8 Face | `models/yolov8m-face-lindevs.pt` | Face detection (custom fine-tuned) | Ultralytics |
+| YOLOv8 Standard | `models/yolov8n.pt` | Fallback person detection | Ultralytics |
+| Eye CNN (fine-tuned) | `models/eye_model_finetuned.pth` | Eye region sad/neutral binary classification | PyTorch ResNet18 |
+| Eye CNN (paper-style) | `models/paper_style_eye_region_fold1_best.pth` | Alternative eye model | PyTorch ResNet18 |
+| Face Landmarker | `models/face_landmarker.task` | Facial landmark detection | MediaPipe |
+| Gesture Recognizer | `models/gesture_recognizer.task` | Hand gesture recognition | MediaPipe |
+| Meta-Learner | `weights/meta_learner_fusion_model.pkl` | Stacking fusion classifier | scikit-learn |
+| Face Alignment | `weights/Alignment_RetinaFace.pth` | Face alignment preprocessing | PyTorch |
+| MobileNet | `weights/mobilenetV1X0.25_pretrain.tar` | Lightweight backbone | PyTorch |
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│  检测到情绪 (如 Sad, Happy, Neutral)                          │
-└─────────────────────┬───────────────────────────────────────┘
-                      │
-         ┌────────────▼────────────┐
-         │  音乐库检索             │
-         │  (优先级：专属 > 全局)   │
-         └────────────┬────────────┘
-                      │
-         ┌────────────▼────────────┐
-         │  随机抽取               │
-         │  (从 N 首文件中随机选 1 首) │
-         └────────────┬────────────┘
-                      │
-         ┌────────────▼────────────┐
-         │  Pygame Mixer 播放      │
-         │  (循环：-1, 音量管理)     │
-         └─────────────────────────┘
-```
+### Eye Model Details
 
-#### Core Features
-
-| Feature | Description |
-|---------|-------------|
-| **Multi-File Random Play** | Each emotion tag can be associated with multiple music files; one is randomly selected each time to avoid repetition fatigue. |
-| **Priority System** | When a logged-in user is recognized, the system first queries their exclusive music library; if empty, it falls back to the global library. |
-| **Dynamic Volume Management** | During TTS voice comfort, background music volume is automatically reduced to 10%-20%; after voice playback ends, volume smoothly restores to 100%. |
-| **Seamless Switching** | If the emotion state remains unchanged and music is playing, playback continues without interruption to avoid abrupt cuts. |
-| **File Format Support** | Supports MP3, WAV, OGG and other audio formats via Pygame mixer. |
-
-#### Database Schema
-
-```sql
-MusicLibrary:
-  - id: Integer (Primary Key)
-  - title: String (Original filename)
-  - filepath: String (Relative path, e.g., assets/music/sad_001.mp3)
-  - emotion_tag: String (e.g., 'sad', 'happy', 'calm')
-  - user_id: Integer (FK -> User.id, NULL = Global resource)
-  - is_active: Boolean (Default: True)
+The eye region model is a **ResNet18** with modified classification head:
+```python
+model = models.resnet18(weights=None)
+model.fc = nn.Sequential(
+    nn.Dropout(p=0.5),
+    nn.Linear(num_ftrs, 2)  # Binary: neutral, sad
+)
 ```
 
-#### API Endpoints
-
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/api/user/upload_music` | POST | User uploads exclusive music (emotion-tagged). |
-| `/api/user/music` | GET | Retrieve user's exclusive music library. |
-| `/api/user/music/{id}` | DELETE | Delete user-uploaded music. |
-| `/api/admin/music` | GET | Retrieve global music library (admin). |
-| `/api/admin/upload_music` | POST | Admin uploads global music. |
-| `/api/admin/music/{id}` | DELETE | Admin deletes global music. |
-
-#### Technical Implementation
-
-- **Pygame Mixer**: Used for background music playback with loop support.
-- **Edge TTS**: Microsoft's cloud-based Text-to-Speech service (zh-CN-XiaoxiaoNeural) for voice comfort generation.
-- **Async Coordination**: Background music pauses during TTS playback via `asyncio.sleep()` and volume ducking.
+**Input**: 224x224 eye region crop (from upper 20%-50% of face)
+**Preprocessing**: ImageNet normalization (mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+**Output**: 2-class softmax probabilities [P_neutral, P_sad]
 
 ---
 
-### Emotion Dynamics Model
+## 15. Experimental Results
 
-#### Architecture
+### Meta-Learner Fusion Model Performance
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│  Real-time Emotion Input (emotion, confidence)              │
-└─────────────────────┬───────────────────────────────────────┘
-                      │
-         ┌────────────▼────────────┐
-         │  Valence Map            │
-         │  (-1.0 ~ 1.0)           │
-         └────────────┬────────────┘
-                      │
-         ┌────────────▼─────────────────────────┐
-         │  EMA Smoothing + Distress Accumulation│
-         │  α=0.2, decay=0.95                   │
-         └────────────┬─────────────────────────┘
-                      │
-         ┌────────────▼────────────┐
-         │  Intervention Trigger   │
-         │  distress > 1.2 + 60s cooldown │
-         └────────────┬────────────┘
-                      │
-         ┌────────────▼────────────┐
-         │  Trigger Voice/Music    │
-         └─────────────────────────┘
-```
-
-#### Core Parameters
-
-| Parameter | Default | Description |
-|-----------|---------|-------------|
-| **ALPHA** | 0.2 | EMA smoothing coefficient, controls emotion response speed |
-| **DECAY** | 0.95 | Stress decay coefficient, simulates natural emotional recovery |
-| **TRIGGER_THRESHOLD** | 1.2 | Intervention trigger threshold |
-| **COOLDOWN** | 60s | Intervention cooldown period, prevents excessive打扰 |
-
-#### Valence Map
-
-| Emotion | Valence Value | Psychological Interpretation |
-|---------|---------------|------------------------------|
-| Happy | +1.0 | High positive valence |
-| Surprise | +0.3 | Slight positive valence |
-| Neutral | 0.0 | Neutral |
-| Sad | -0.6 | Moderate negative valence |
-| Fear | -0.8 | High negative valence |
-| Angry | -1.0 | Extreme negative valence |
-| Disgust | -0.9 | High negative valence |
-| Contempt | -0.7 | Moderate-high negative valence |
-
-#### Intervention Trigger Logic
-
-```python
-# Stress accumulation: accumulates during negative valence, decays during positive
-if valence_ema < 0:
-    distress = distress * 0.95 + abs(valence_ema)
-else:
-    distress *= 0.95
-
-# Trigger condition: distress exceeds threshold + cooldown period elapsed
-if time_since_last_intervention > 60s and distress > 1.2:
-    trigger_intervention = True
-    distress *= 0.5  # Stress halved after intervention
-```
-
-#### Technical Features
-
-- **EMA Smoothing**: Avoids misjudgment due to single-frame emotion fluctuations
-- **Stress Accumulation Model**: Simulates real emotional stress persistence and decay characteristics
-- **Cooldown Mechanism**: Prevents excessively frequent interventions, reduces user disturbance
-- **Adaptive Intervention**: Dynamically triggers based on valence changes and fluctuation patterns
-
----
-
-### Data Management
-- SQLite database storage.
-- Emotion logs, system events, music library, comfort scripts management.
-- Data visualization and analytics.
-
-## Tech Stack
-
-| Module | Technology |
-|------|------|
-| Backend | Python, FastAPI, OpenCV, SQLAlchemy |
-| Frontend | Vue 3, Element Plus, ECharts, Axios |
-| Deep Learning | PyTorch, DeepFace, YOLOv8, HSEmotion |
-| Database | SQLite |
-| Model Fusion | Scikit-learn (Random Forest) |
-
-## Face Recognition System Architecture
-
-### Overall Pipeline
-
-```
-Video Input → Face Detection → Eye Region Detection → Feature Extraction → Emotion Classification → Fusion Decision → Output
-                 ↓                   ↓                     ↓
-            YOLOv8            Haar Cascade        Global/Local Features
-                                                           ↓
-                                                   Meta-Learner Fusion
-```
-
-### Core Modules
-
-#### 1. Face Detection & Eye Localization
-- **Detector**: YOLOv8-Face (for global face bounding box detection).
-- **Eye Localization**: Haar Cascade applied strictly to the upper ROI of the detected face, preventing interference from lower facial features (e.g., mouth).
-
-#### 2. Global Feature Extraction (HSEmotion)
-- **Backbone**: EfficientNet-B0
-- **Input Size**: 48×48 grayscale face or 224×224 RGB
-- **Output**: 7-class emotion probability distribution (Happy, Sad, Angry, Fear, Surprise, Disgust, Neutral)
-- **Pretraining**: AffectNet dataset + OAHEGA fine-tuning
-
-#### 3. Local Feature Extraction (Eye Region Model)
-- **Model Architecture**: Modified ResNet18 (with Dropout for robust 2-class output)
-- **Input Size**: 224×224 eye region crop
-- **Output**: 2-class probability (Sad, Neutral)
-- **Specialty**: Sad micro-expression recognition (inspired by Gorbova et al., 2019)
-
-#### 4. Meta-Learner Fusion Module
-- **Meta-Classifier**: Random Forest (max depth 5 to prevent overfitting)
-- **Input Features**: 6D feature vector `[p_sad, p_neutral, eye_sad, p_angry, p_happy, p_surprise]`
-- **Output**: Final emotion category
-- **Training**: Stacking training using soft probabilities to eliminate data distribution drift
-
-## Fusion Decision-Making Principles
-
-### Meta-Learner Fusion Architecture
-
-This system employs a decision-level fusion architecture based on the Stacking strategy, integrating predictions from the global face model (HSEmotion) and local eye region model (ResNet) through a meta-learner, achieving more accurate emotion recognition than single models.
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                      Input Face Image                        │
-└─────────────────────┬───────────────────────────────────────┘
-                      │
-         ┌────────────┴────────────┐
-         │                         │
-    ┌────▼────┐              ┌────▼────┐
-    │ Global  │              │  Local  │
-    │  Model  │              │  Model  │
-    │HSEmotion│              │Eye ResNet│
-    └────┬────┘              └────┬────┘
-         │                         │
-    ┌────▼────────────────────────▼────┐
-    │      Feature Concatenation (6D)  │
-    │[p_sad, p_neutral, eye_sad,      │
-    │  p_angry, p_happy, p_surprise]   │
-    └─────────────┬────────────────────┘
-                  │
-         ┌────────▼────────┐
-         │  Meta-Classifier │
-         │ (Random Forest)   │
-         └────────┬────────┘
-                  │
-         ┌────────▼────────┐
-         │   Final Output   │
-         │  (7 Emotions)    │
-         └─────────────────┘
-```
-
-### Four Core Innovation Mechanisms (Code Implementation)
-
-#### 1. Occlusion-Aware Adaptive Fallback
-
-**Problem**: When eyes are occluded by hair, glasses, or hands, forcing a geometric crop introduces severe noise.
-
-**Code Implementation** (`eye_feature_extractor.py:extract_eye_region`):
-```python
-# 🚨 Failed! Trigger debug image saving mechanism
-logger.debug("⚠️ Eyes occluded (sunglasses/head down), local expert ineffective, refusing to guess")
-
-# Core change: Never do hard crop! Directly tell upper layer "I can't see"
-return None
-```
-
-**Upper Layer Handling** (`decision_fusion_detector.py:analyze_emotion`):
-```python
-# Step 3: Get eye probability & occlusion immunity mechanism
-P_eye = self._get_eye_sad_prob(frame_bgr, face_rect)
-
-# 🚨 Sunglasses / closed eyes / no eyes detected -> local expert is "blind", 100% trust global!
-if P_eye < 0:  # When extract_eye_region returns None, _get_eye_sad_prob returns -1
-    return top_emotion, top_confidence  # Directly return global model result
-```
-
-**Design Philosophy**: If a person is wearing sunglasses, the eye expert is "blind". At this point, we should immediately strip the eye expert's voting rights and 100% trust the global model (HSEmotion), because the global model can still see lips, facial muscles, and head posture.
-
-#### 2. Asymmetric Confidence Gating
-
-**Problem**: Meta-classifier may overly override correct predictions from the baseline model on high-confidence samples ("catastrophic overriding").
-
-**Code Implementation** (`decision_fusion_detector.py:analyze_emotion`):
-```python
-# Step 2: High confidence direct pass & gating interception
-if top_confidence >= 80.0:
-    return top_emotion, top_confidence  # High confidence direct output, skip fusion
-
-p_sad = all_emotions.get('sad', 0.0)
-p_neutral = all_emotions.get('neutral', 0.0)
-is_target_top = (top_emotion in self.FUSION_TARGET_EMOTIONS)
-
-# Non-target emotion + medium-high confidence -> no fusion triggered
-if not is_target_top:
-    if top_confidence > 55.0 or (p_sad < 25.0 and p_neutral < 25.0):
-        return top_emotion, top_confidence
-```
-
-**Effect**: On high-arousal categories like Happy, the recall rate remains stable at 0.94. The fusion algorithm achieves a non-destructive integration by preserving the baseline's strengths.
-
-#### 3. Dynamic Trigger Boundary Extension
-
-**Problem**: Traditional fixed threshold methods miss potential emotions (e.g., a 26% sadness signal might be genuine sadness).
-
-**Solution**:
-- Extend the trigger boundary down to 25%: `sad >= 25%` or `neutral >= 25%` is judged as a hesitant state, activating the meta-learner.
-- **Effect**: Neutral recall rate jumped from 0.60 to 0.66 (+6%), accurately correcting the pain point of "expressionless" faces being overly sensitively misclassified as sadness.
-
-#### 4. Domain Adaptation via Soft Probabilities
-
-**Problem**: Simple rule-based fusion (e.g., k=0.5) cannot capture complex non-linear dependencies among multiple classes.
-
-**Training Pipeline**:
-1. Generate core 5-class soft probabilities using HSEmotion on the validation set.
-2. Generate eye sad probability using the Eye ResNet.
-3. Concatenate into a **6D feature vector**, and retrain the Random Forest to eliminate data drift.
-4. The meta-classifier implicitly learns the arbitration rules for "when to trust global" vs "when to trust local" through its decision tree structure.
-
-**Effect**: Overall accuracy improved from 71.94% to 72.80% (+0.86%), and Macro-F1 improved from 74.07% to 74.73% (+0.66%).
-
-### Fusion Decision Flow (Complete Code Logic)
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│  Step 1: Get Global Emotion Distribution (HSEmotion Probs)   │
-└─────────────────────┬───────────────────────────────────────┘
-                      │
-         ┌────────────▼────────────┐
-         │  Step 2: High Conf Gate │
-         │  if confidence >= 80%   │──── Yes ────→ Direct Output
-         │  if confidence > 55% &  │
-         │     not target emotion  │
-         └────────────┬────────────┘
-                      No
-         ┌────────────▼────────────┐
-         │  Step 3: Detect Eye      │
-         │  if P_eye < 0 (occluded) │──── Yes ────→ Fallback to Global
-         └────────────┬────────────┘
-                      No
-         ┌────────────▼────────────┐
-         │  Step 4: Meta-Learner    │
-         │  features = [5 global +1 eye] │
-         │  if meta_conf < 55%      │──── Yes ────→ Fallback (Abstain)
-         │  if not target & < 75%   │
-         └────────────┬────────────┘
-                      No
-         ┌────────────▼────────────┐
-         │  Step 5: Accept Meta-   │
-         │          Learner Result │
-         └─────────────────────────┘
-```
-
-## Emotion Categories
-
-The system supports the following 7 basic emotion recognitions:
-- Happy
-- Sad
-- Angry
-- Fear
-- Surprise
-- Disgust
-- Neutral
-
-## Dataset
-
-### OAHEGA Emotion Recognition Dataset
-
-The emotion recognition dataset used in this project mainly contains various emotion categories: Happy, Angry, Sad, Neutral, Surprise, etc.
-
-**Dataset Features:**
-- Image Format: RGB cropped face images
-- Data Sources: Scraped from Facebook, Instagram, YouTube videos, and public datasets like IMDB and AffectNet.
-- *(Note: To align with mainstream emotion recognition benchmarks, the dataset-specific 'Ahegao' class and extremely low-frequency categories were excluded, focusing the evaluation on 5 core high-frequency emotions to validate fusion effectiveness.)*
-
-**Citation:**
-```
-Kovenko, Volodymyr; Shevchuk, Vitalii (2021), "OAHEGA : EMOTION RECOGNITION DATASET", Mendeley Data, V2, doi: 10.17632/5ck5zz6f2c.2
-```
-
-## Experimental Results
-
-### Meta-Learner Fusion Model Performance Evaluation
-
-Rigorous comparative testing results on a large-scale mixed emotion dataset with **8,539 samples**:
+Evaluated on **8,539 samples** from a mixed emotion dataset:
 
 **Data Distribution:** Angry (1306), Happy (2000), Neutral (2000), Sad (2000), Surprise (1233)
 
-| Model Architecture | Overall Accuracy | Macro-F1 |
+| Model Architecture | Accuracy | Macro-F1 |
 |----------|----------|----------|
 | DeepFace Single Model (Classic Baseline) | 30.10% | 35.10% |
 | HSEmotion Single Model (SOTA Baseline) | 71.94% | 74.07% |
 | **Meta-Learner Fusion (Proposed)** | **72.80%** (+0.86%) | **74.73%** (+0.66%) |
 
-### Fine-Grained Emotion Diagnosis and HCI Value
+### Fine-Grained Emotion Analysis
 
-| Emotion | Breakthrough & HCI Value |
-|---------|--------------|
-| **Neutral** | Recall jumped from 0.60 to **0.66** (**+6%**), accurately correcting the critical issue where "expressionless" faces are overly sensitively misjudged as sadness. |
-| **Angry** | Precision improved from 0.69 to **0.72**. Since Neutral emotions are accurately intercepted, this brings a spillover benefit of suppressing false positives. |
-| **Sad** | Precision maintained at a high level of **0.87**. The meta-learner shows "restraint" on ambiguous boundaries, preferring to miss extremely slight sadness rather than making unwarranted interventions, thereby greatly reducing the intrusiveness of the companion AI. |
-| **Happy** | Recall is rock-solid at **0.94**. The non-destructive fusion perfectly preserves the baseline model's advantage in high-arousal emotions. |
+| Emotion | Metric | Before | After | Improvement | HCI Value |
+|---------|--------|--------|-------|-------------|-----------|
+| **Neutral** | Recall | 0.60 | **0.66** | +6% | Corrects "expressionless" misclassified as sad |
+| **Angry** | Precision | 0.69 | **0.72** | +3% | Suppresses false positives via better neutral interception |
+| **Sad** | Precision | -- | **0.87** | -- | High restraint: avoids unwarranted interventions |
+| **Happy** | Recall | -- | **0.94** | -- | Non-destructive fusion preserves high-arousal detection |
 
-## Features Highlights
+### Four Core Innovation Mechanisms
 
-1. **Multi-Modal Fusion**: Combines global face and eye region features to eliminate local noise and improve recognition accuracy.
-2. **Configurable Architecture**: Supports switching between multiple detectors to meet different scenario requirements.
-3. **Closed-Loop Feedback**: A diary system used to calibrate and optimize emotion recognition parameters.
-4. **Real-Time Intervention**: Automatically triggers music and voice interventions based on emotional states.
-5. **Data Visualization**: ECharts visualize emotion trends and analytical reports.
+1. **Occlusion-Aware Adaptive Fallback**: When eyes are occluded (sunglasses, head down), the system returns -1.0 for `P_eye`, triggering 100% trust in the global model. This prevents noise from geometric cropping of occluded regions.
+
+2. **Asymmetric Confidence Gating**: High-confidence predictions (>= 80%) bypass fusion entirely, preventing the meta-learner from "catastrophically overriding" correct baseline predictions.
+
+3. **Dynamic Trigger Boundary Extension**: Fusion activates when sad >= 25% OR neutral >= 25%, extending the trigger boundary downward to catch borderline cases that fixed thresholds would miss.
+
+4. **Domain Adaptation via Soft Probabilities**: Instead of hard class labels, the meta-learner trains on soft probability distributions from base models, eliminating data distribution drift between training and inference.
+
+---
+
+## 16. Dataset
+
+### OAHEGA Emotion Recognition Dataset
+
+**Citation:**
+```
+Kovenko, Volodymyr; Shevchuk, Vitalii (2021), "OAHEGA: EMOTION RECOGNITION DATASET",
+Mendeley Data, V2, doi: 10.17632/5ck5zz6f2c.2
+```
+
+**Characteristics:**
+- RGB cropped face images
+- Sources: Facebook, Instagram, YouTube videos, IMDB, AffectNet
+- Classes used: Happy, Angry, Sad, Neutral, Surprise
+- Note: The dataset-specific 'Ahegao' class and extremely low-frequency categories were excluded to align with mainstream emotion recognition benchmarks.
+
+---
+
+## 17. Academic References
+
+1. **Gorbova et al. (2019)**: "Going deeper in hidden sadness recognition using spontaneous micro-expressions database." *Springer Science+Business Media*. -- Foundation for eye-region sadness analysis.
+
+2. **HSEmotion (EmotiEffLib)**: High-speed emotion recognition using EfficientNet. -- Global face emotion baseline.
+
+3. **DeepFace**: "DeepFace: Closing the Gap to Human-Level Performance in Face Verification." *CVPR 2014*. -- Face embedding and emotion recognition.
+
+4. **HRV Analysis**: RMSSD methodology adapted from Heart Rate Variability literature for emotion fluctuation quantification.
+
+5. **Kalman Filter**: 1D state estimation for mood trajectory smoothing.
+
+6. **Dynamical Systems Theory**: Attractor model for personalized emotional baseline computation.
+
+---
 
 ## License
 
 MIT License
-
-## Acknowledgments
-
-- [DeepFace](https://github.com/serengil/deepface)
-- [HSEmotion](https://github.com/HSEmotion/emotion)
-- [FER](https://github.com/oarriaga/face_classification)
-- [YOLOv8](https://github.com/ultralytics/ultralytics)
-- **Academic Paper Reference**:
-  - Gorbova, J., Colovic, M., Marjanovic, M., Njegus, A., & Anbarjafari, G. (2019). Going deeper in hidden sadness recognition using spontaneous micro-expressions database. *Springer Science+Business Media*.
-
----
-
----
-  # EmotiSense - 实时情绪检测系统
-
-一个基于计算机视觉和深度学习的多模态情绪识别系统，能够实时分析人脸情绪并提供音乐、语音等干预反馈。
-
-## 项目架构
-
-```
-EmotiSense/
-├── backend/           # FastAPI 后端服务
-│   ├── app/          # API 路由和应用逻辑
-│   ├── core/         # 核心检测算法
-│   ├── models/       # 预训练情绪模型
-│   ├── weights/      # 模型权重文件
-│   └── config.yaml   # 配置文件
-├── frontend/         # Vue 3 前端应用
-│   ├── src/
-│   │   ├── views/    # 页面组件
-│   │   ├── layouts/  # 布局组件
-│   │   └── assets/   # 静态资源
-│   └── dist/         # 构建输出
-└── weights/          # 额外模型权重
-```
-
-## 核心功能
-
-### 情绪检测
-- **多模型融合**: 支持 DeepFace、HSEmotion、FER 等多种情绪识别模型
-- **元学习器融合**: 基于 Stacking 分类器的决策级融合，提升识别准确率
-- **眼部微表情分析**: 独立的眼部区域情绪检测，增强悲伤等微表情识别
-- **实时视频流处理**: 基于 OpenCV 的实时人脸检测和情绪分析
-
-### 用户系统
-- 用户注册/登录与人脸识别
-- 个人情绪日志记录
-- 日记闭环反馈系统
-
-### 干预系统
-- **音乐播放**: 根据情绪状态自动播放对应音乐，支持多文件随机播放、专属音乐优先、动态音量管理。
-- **语音安慰**: 使用 Edge TTS (zh-CN-XiaoxiaoNeural) 播放预设安慰话术，自动压低背景音乐。
-- **动力学模型**: 基于情绪价态变化和波动模式的干预决策算法。
-
----
-
-### 音乐干预系统
-
-#### 系统架构
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│  检测到情绪 (如 Sad, Happy, Neutral)                          │
-└─────────────────────┬───────────────────────────────────────┘
-                      │
-         ┌────────────▼────────────┐
-         │  音乐库检索             │
-         │  (优先级：专属 > 全局)   │
-         └────────────┬────────────┘
-                      │
-         ┌────────────▼────────────┐
-         │  随机抽取               │
-         │  (从 N 首文件中随机选 1 首) │
-         └────────────┬────────────┘
-                      │
-         ┌────────────▼────────────┐
-         │  Pygame Mixer 播放      │
-         │  (循环：-1, 音量管理)     │
-         └─────────────────────────┘
-```
-
-#### 核心功能
-
-| 功能 | 说明 |
-|------|------|
-| **多文件随机播放** | 每个情绪标签可关联多首音乐文件，每次随机抽取一首播放，避免重复疲劳。 |
-| **优先级系统** | 当识别到已登录用户时，优先检索其专属音乐库；若为空则回退至全局音乐库。 |
-| **动态音量管理** | TTS 语音安慰时自动将背景音乐音量降至 10%-20%；语音播放结束后平滑恢复至 100%。 |
-| **无缝切换** | 若情绪状态未变化且音乐正在播放，则不中断当前播放，避免突兀切断。 |
-| **文件格式支持** | 通过 Pygame mixer 支持 MP3、WAV、OGG 等音频格式。 |
-
-## 人脸识别系统架构
-
-### 整体流程
-
-```
-视频输入 → 人脸检测 → 眼部区域检测 → 特征提取 → 情绪分类 → 融合决策 → 输出结果
-              ↓            ↓             ↓
-         YOLOv8      Haar Cascade    全局/局部特征
-                                          ↓
-                                     元学习器融合
-```
-
-### 核心模块
-
-#### 1. 人脸检测与眼部定位
-- **检测器**: YOLOv8-Face (全局人脸框检测)
-- **眼部定位**: 基于 Haar Cascade 在人脸 ROI 上半区域进行精准裁剪，避免下半脸（如嘴部）干扰
-
-#### 2. 全局特征提取（HSEmotion）
-- **骨干网络**: EfficientNet-B0
-- **输入尺寸**: 48×48 灰度人脸或 224×224 RGB
-- **输出**: 7 类情绪概率分布 (Happy, Sad, Angry, Fear, Surprise, Disgust, Neutral)
-- **预训练**: AffectNet 数据集 + OAHEGA 微调
-
-#### 3. 局部特征提取（眼部模型）
-- **模型架构**: 改良版 ResNet18 (引入 Dropout 防过拟合，双分类输出)
-- **输入尺寸**: 224×224 眼部区域裁剪
-- **输出**: 2 类概率 (Sad, Neutral)
-- **专长**: 悲伤微表情识别（参考 Gorbova 等，2019）
-
-#### 4. 元学习器融合模块
-- **元分类器**: Random Forest (最大深度 5，防过拟合)
-- **输入特征**: 6 维特征向量 `[p_sad, p_neutral, eye_sad, p_angry, p_happy, p_surprise]`
-- **输出**: 最终情绪类别
-- **训练方式**: 提取软概率进行 Stacking 训练，解决数据分布漂移问题
-
-## 融合决策原理
-
-### Meta-Learner Fusion 架构
-
-本系统采用基于 Stacking 策略的决策级融合架构，通过元学习器整合全局人脸模型（HSEmotion）和局部眼部模型的预测结果，实现比单一模型更准确的情绪识别。
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    输入人脸图像                              │
-└─────────────────────┬───────────────────────────────────────┘
-                      │
-         ┌────────────┴────────────┐
-         │                         │
-    ┌────▼────┐              ┌────▼────┐
-    │ 全局模型 │              │ 局部模型 │
-    │HSEmotion│              │眼部ResNet│
-    └────┬────┘              └────┬────┘
-         │                         │
-    ┌────▼────────────────────────▼────┐
-    │      特征拼接层 (6维)             │
-    │[p_sad, p_neutral, eye_sad,      │
-    │  p_angry, p_happy, p_surprise]   │
-    └─────────────┬────────────────────┘
-                  │
-         ┌────────▼────────┐
-         │  元分类器        │
-         │ (Random Forest) │
-         └────────┬────────┘
-                  │
-         ┌────────▼────────┐
-         │   最终输出       │
-         │  (7 类情绪)      │
-         └─────────────────┘
-```
-
-### 四大核心创新机制（代码实现对应）
-
-#### 1. 感知遮挡的自适应退避机制 (Occlusion-Aware Adaptive Fallback)
-
-**问题**: 眼部被头发、眼镜或手遮挡时，强制裁剪局部特征会引入严重噪声。
-
-**代码实现** (`eye_feature_extractor.py:extract_eye_region`):
-```python
-# 🚨 失败了！触发 Debug 存图机制
-logger.debug("⚠️ 眼睛被遮挡（墨镜/低头），局部专家失效，拒绝瞎猜")
-
-# 核心修改：绝对不要硬裁剪！直接告诉上层"我看不见"
-return None
-```
-
-**上层处理** (`decision_fusion_detector.py:analyze_emotion`):
-```python
-# Step 3：获取眼睛概率 & 遮挡免疫机制
-P_eye = self._get_eye_sad_prob(frame_bgr, face_rect)
-
-# 🚨 戴了墨镜 / 闭眼 / 没找到眼睛 -> 局部专家"瞎了"，100% 听全局！
-if P_eye < 0:  # extract_eye_region 返回 None 时，_get_eye_sad_prob 返回 -1
-    return top_emotion, top_confidence  # 直接返回全局模型结果
-```
-
-**设计哲学**: 如果一个人戴着墨镜，眼睛专家就"瞎了"，这时候我们应该立刻剥夺眼睛专家的投票权，100% 信任全局模型（HSEmotion），因为全局模型还能看到嘴唇、面部肌肉和头部姿态。
-
-#### 2. 非对称置信度门控 (Asymmetric Confidence Gating)
-
-**问题**: 元分类器可能过度推翻基线模型在高置信度样本上的正确预测（"灾难性推翻"）。
-
-**代码实现** (`decision_fusion_detector.py:analyze_emotion`):
-```python
-# Step 2：高置信度直通与门控拦截
-if top_confidence >= 80.0:
-    return top_emotion, top_confidence  # 高置信度直接输出，跳过融合
-
-p_sad = all_emotions.get('sad', 0.0)
-p_neutral = all_emotions.get('neutral', 0.0)
-is_target_top = (top_emotion in self.FUSION_TARGET_EMOTIONS)
-
-# 非目标情绪 + 中高置信度 -> 不触发融合
-if not is_target_top:
-    if top_confidence > 55.0 or (p_sad < 25.0 and p_neutral < 25.0):
-        return top_emotion, top_confidence
-```
-
-**效果**: 在 Happy 等高唤醒度类别上，召回率稳定在 0.94，融合算法实现了"取其精华去其糟粕"的非破坏性融合。
-
-#### 3. 动态触发边界扩展 (Dynamic Trigger Boundary)
-
-**问题**: 传统固定阈值法会漏掉潜在边缘情绪（如 26% 的悲伤信号可能是真悲伤）。
-
-**解决方案**:
-- 将触发边界下探至 25%：`sad >= 25%` 或 `neutral >= 25%` 即判定为犹豫状态，唤醒元学习器。
-- **效果**: Neutral 召回率从 0.60 跃升至 0.66（+6%），精准纠正"面无表情"被过度敏感地误判为悲伤的痛点。
-
-#### 4. 基于软概率的领域适应重塑 (Domain Adaptation via Soft Probabilities)
-
-**问题**: 简单的权重规则融合（如 k=0.5）无法捕捉多类别的非线性依赖关系。
-
-**训练流程**:
-1. 用 HSEmotion 在验证集上生成核心 5 类情绪软概率。
-2. 用眼部 ResNet 生成眼部 sad 概率。
-3. 拼接为 **6 维特征向量**，重新训练 Random Forest 以消除数据漂移。
-4. 元分类器通过决策树结构隐式学习了"何时相信全局"与"何时相信局部"的仲裁规则。
-
-**效果**: 整体准确率从 71.94% 提升至 72.80%（+0.86%），Macro-F1 从 74.07% 提升至 74.73%（+0.66%）。
-
-### 融合决策流程（完整代码逻辑）
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│  Step 1: 获取全局情绪分布 (HSEmotion 概率)                     │
-└─────────────────────┬───────────────────────────────────────┘
-                      │
-         ┌────────────▼────────────┐
-         │  Step 2: 高置信度门控    │
-         │  if confidence >= 80%   │──── Yes ────→ 直通输出
-         │  if confidence > 55% &  │
-         │     not target emotion  │
-         └────────────┬────────────┘
-                      No
-         ┌────────────▼────────────┐
-         │  Step 3: 检测眼部特征    │
-         │  if P_eye < 0 (遮挡)     │──── Yes ────→ 退避至全局
-         └────────────┬────────────┘
-                      No
-         ┌────────────▼────────────┐
-         │  Step 4: 元学习器预测    │
-         │  features = [5 全局 +1 眼部] │
-         │  if meta_conf < 55%      │──── Yes ────→ 回退全局 (弃权)
-         │  if not target & < 75%   │
-         └────────────┬────────────┘
-                      No
-         ┌────────────▼────────────┐
-         │  Step 5: 采纳元学习器结果 │
-         └─────────────────────────┘
-```
-
-## 情绪类别
-
-系统支持以下 7 种基本情绪识别：
-- 快乐 (Happy)
-- 悲伤 (Sad)
-- 愤怒 (Angry)
-- 恐惧 (Fear)
-- 惊讶 (Surprise)
-- 厌恶 (Disgust)
-- 中性 (Neutral)
-
-## 数据集
-
-### OAHEGA Emotion Recognition Dataset
-
-本项目使用的情绪识别数据集主要包含多种情绪类别：Happy、Angry、Sad、Neutral、Surprise 等。
-
-**数据集特点：**
-- 图像格式：RGB 人脸裁剪图像
-- 数据来源：Facebook、Instagram 社交网络爬取，YouTube 视频，以及 IMDB、AffectNet 等公开数据集
-- *(注：为对齐主流情绪识别基准，本次评估剔除了数据集特有的 Ahegao 类别与极低频类别，并聚焦于 5 种核心高频情绪进行融合有效性验证。)*
-
-**引用：**
-```
-Kovenko, Volodymyr; Shevchuk, Vitalii (2021), "OAHEGA : EMOTION RECOGNITION DATASET", Mendeley Data, V2, doi: 10.17632/5ck5zz6f2c.2
-```
-
-## 实验结果
-
-### 元学习器融合模型性能评估
-
-在 **8,539 个样本** 的大规模混合情绪数据集上进行的严格对比测试结果：
-
-**数据分布：** Angry (1306), Happy (2000), Neutral (2000), Sad (2000), Surprise (1233)
-
-| 模型架构 | 总体准确率 (Accuracy) | 宏平均 F1 (Macro-F1) |
-|----------|----------------------|---------------------|
-| DeepFace 单体 (经典基准) | 30.10% | 35.10% |
-| HSEmotion 单体 (SOTA 基线) | 71.94% | 74.07% |
-| **Meta-Learner Fusion (本文提出)** | **72.80%** (+0.86%) | **74.73%** (+0.66%) |
-
-### 细粒度情绪诊断与产品价值
-
-| 情绪 | 突破点与 HCI 价值 |
-|------|----------------|
-| **中性 (Neutral)** | 召回率从 0.60 跃升至 **0.66**（提升 **6%**），精准纠正"面无表情"被过度敏感误判为悲伤的痛点。 |
-| **愤怒 (Angry)** | 精确率从 0.69 提升至 **0.72**，由于中性情绪被精准拦截，带来了假阳性被抑制的溢出红利。 |
-| **悲伤 (Sad)** | 精确率维持 **0.87** 极高水准。元学习器在模棱两可边界上表现出"克制"，宁可漏判极其轻微的悲伤，也绝不无病呻吟，从而极大降低了陪伴型 AI 的打扰感。 |
-| **快乐 (Happy)** | 召回率稳如磐石（**0.94**），非破坏性融合完美保留了基线模型的高唤醒度情绪优势。 |
-
-## 项目特色
-
-1. **多模态融合**: 结合全局人脸和眼部区域特征，消除局部噪声提升识别准确率
-2. **可配置架构**: 支持多种检测器切换，适应不同场景需求
-3. **闭环反馈**: 日记系统用于校准和优化情绪识别参数
-4. **实时干预**: 基于情绪状态自动触发音乐、语音等干预措施
-5. **数据可视化**: ECharts 图表展示情绪趋势和分析报告
-
-## 许可证
-
-MIT License
-
-## 致谢
-
-- [DeepFace](https://github.com/serengil/deepface)
-- [HSEmotion](https://github.com/HSEmotion/emotion)
-- [FER](https://github.com/oarriaga/face_classification)
-- [YOLOv8](https://github.com/ultralytics/ultralytics)
-- **学术论文参考**:
-  - Gorbova, J., Colovic, M., Marjanovic, M., Njegus, A., & Anbarjafari, G. (2019). Going deeper in hidden sadness recognition using spontaneous micro-expressions database. *Springer Science+Business Media*.
-
----

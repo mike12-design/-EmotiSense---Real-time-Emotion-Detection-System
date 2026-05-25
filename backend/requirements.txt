@@ -1,0 +1,27 @@
+fastapi==0.128.8
+uvicorn[standard]==0.40.0
+sqlalchemy==2.0.46
+opencv-python==4.11.0.86
+deepface==0.0.79
+ultralytics==8.4.14
+pygame==2.6.1
+edge-tts==7.2.7
+pyyaml
+python-dotenv==1.2.1
+httpx==0.28.1
+scikit-learn==1.7.2
+joblib==1.5.3
+numpy==1.26.4
+pydantic==2.12.5
+torch==2.2.2
+torchvision==0.17.2
+timm==0.9.16
+matplotlib==3.10.1
+seaborn==0.13.2
+tqdm==4.67.3
+python-multipart==0.0.21
+aiofiles==25.1.0
+
+# 可选检测器 (如果 config.yaml 里 detector_type 不用这两个可以注释掉)
+hsemotion==0.3.0
+fer==25.10.3

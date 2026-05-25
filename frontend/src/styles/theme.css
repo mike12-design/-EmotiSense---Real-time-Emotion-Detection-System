@@ -103,8 +103,8 @@ html, body {
     sans-serif;
   font-size: 15px;
   line-height: 1.6;
-  color: var(--text-primary);
-  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 50%, #fafafc 100%);
+  color: rgba(255, 255, 255, 0.92);
+  background: #050607;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }

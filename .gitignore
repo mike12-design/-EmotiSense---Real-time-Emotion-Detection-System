@@ -15,3 +15,29 @@ ENV/
 .vscode/
 *.swp
 *.swo
+
+# 调试产物
+debug_no_eyes/
+eye/
+
+# 测试产物
+frontend/test-results/
+frontend/playwright-report/
+
+# 工具运行时
+.agents/
+.claude/
+.omc/
+
+# SQLite 数据库文件（仅根目录和前端副本）
+/emotisense.db
+/frontend/emotisense.db
+
+# 临时/备份文件
+*_backup_*.vue
+* copy.py
+*.db-shm
+*.db-wal
+
+# 播放列表/音乐缓存
+backend/assets/music/

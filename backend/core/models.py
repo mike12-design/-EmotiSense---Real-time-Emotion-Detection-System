@@ -1,12 +1,29 @@
-from sqlalchemy import create_engine, Column, Integer, String, Float, Boolean, DateTime, ForeignKey, Text, JSON
+from sqlalchemy import create_engine, event, Column, Integer, String, Float, Boolean, DateTime, ForeignKey, Text, JSON
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 import datetime
-# backend/app/database.py
-# 数据库文件路径
+
 SQLALCHEMY_DATABASE_URL = "sqlite:///./emotisense.db"
 
-engine = create_engine(SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False})
+engine = create_engine(
+    SQLALCHEMY_DATABASE_URL,
+    connect_args={
+        "check_same_thread": False,
+        "timeout": 15,  # 写锁等待超时（秒）
+    },
+    pool_size=10,       # 连接池大小
+    max_overflow=5,     # 溢出连接数
+)
+
+@event.listens_for(engine, "connect")
+def _set_sqlite_pragma(dbapi_connection, connection_record):
+    """启用 WAL 模式，允许读写并发，大幅降低页面查询延迟"""
+    cursor = dbapi_connection.cursor()
+    cursor.execute("PRAGMA journal_mode=WAL;")
+    cursor.execute("PRAGMA synchronous=NORMAL;")
+    cursor.execute("PRAGMA busy_timeout=5000;")
+    cursor.close()
+
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
@@ -41,6 +58,8 @@ class SystemEvent(Base):
     final_mood = Column(String)
     action_type = Column(String) # music / tts / none
     resource_id = Column(Integer)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    username = Column(String, nullable=True)
 
 # 4. 音乐资源库
 class MusicLibrary(Base):
@@ -68,6 +87,14 @@ class Diary(Base):
     content = Column(Text, nullable=False) # 日记正文
     emotion = Column(String, nullable=True) # 记录时的心情 (如 Happy, Sad)
     timestamp = Column(DateTime, default=datetime.datetime.utcnow) # 记录时间
+
+# 7. 用户隐藏全局资源表（用户删全局资源时只对自己隐藏）
+class UserHiddenGlobal(Base):
+    __tablename__ = "user_hidden_global"
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    item_type = Column(String, nullable=False)  # "script" 或 "music"
+    item_id = Column(Integer, nullable=False)   # 全局资源的 id
 
 # 修改 init_db 确保新表被创建
 def init_db():
