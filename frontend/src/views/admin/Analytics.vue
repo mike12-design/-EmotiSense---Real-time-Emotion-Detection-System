@@ -571,7 +571,7 @@ onUnmounted(() => {
                 <el-icon><Warning /></el-icon>
                 <span>高危干预预警台</span>
                 <el-tag size="small" type="danger" v-if="alertFeed.length > 0">
-                  {{ alertTotal }} 条警报
+                  {{ alertFeed.length }} 条警报
                 </el-tag>
               </div>
             </template>
