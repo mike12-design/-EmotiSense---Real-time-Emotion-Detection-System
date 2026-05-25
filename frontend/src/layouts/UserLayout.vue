@@ -4,7 +4,6 @@
     <el-header class="user-header">
       <!-- 【修改点】添加 @click 跳转事件，并增加 pointer 手势样式 -->
       <div class="logo-area" @click="router.push('/')" title="返回监控大屏">
-        <span class="logo-icon">🌿</span>
         <span class="logo-text">EmotiSense | 个人空间</span>
       </div>
       

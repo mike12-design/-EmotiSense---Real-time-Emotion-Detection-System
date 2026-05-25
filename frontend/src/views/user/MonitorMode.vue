@@ -21,9 +21,6 @@
 
         <!-- 左侧：Logo -->
         <div class="logo-group" @click="refreshPage" title="刷新页面">
-          <div class="logo-icon-wrapper">
-            <span class="logo-icon">💙</span>
-          </div>
           <div class="logo-text-group">
             <span class="logo-text">EmotiSense</span>
             <span class="logo-status">情绪实时监测系统</span>
@@ -413,21 +410,6 @@ const toggleFullscreen = () => {
 
 .logo-group:hover {
   background: var(--primary-50);
-}
-
-.logo-icon-wrapper {
-  width: 40px;
-  height: 40px;
-  background: linear-gradient(135deg, #e0f2fe, #bae6fd);
-  border-radius: 10px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 4px 12px rgba(14, 165, 233, 0.15);
-}
-
-.logo-icon {
-  font-size: 22px;
 }
 
 .logo-text-group {

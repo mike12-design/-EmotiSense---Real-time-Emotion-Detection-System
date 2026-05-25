@@ -4,7 +4,6 @@
     <!-- 左侧边栏 -->
     <el-aside width="240px" class="aside">
       <div class="logo-section">
-        <div class="logo-icon">💙</div>
         <div class="logo-text">
           <span class="logo-title">EmotiSense</span>
           <span class="logo-subtitle">管理系统</span>
@@ -132,11 +131,6 @@ const handleLogout = () => {
   gap: 14px;
   padding: 0 24px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-.logo-icon {
-  font-size: 32px;
-  filter: drop-shadow(0 4px 8px rgba(14, 165, 233, 0.3));
 }
 
 .logo-text {
