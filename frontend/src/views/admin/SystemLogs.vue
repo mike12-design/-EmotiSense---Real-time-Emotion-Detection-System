@@ -1,13 +1,46 @@
 <template>
   <div class="logs-page">
 
-    <!-- 统计卡片行 -->
+    <!-- 顶部：用户选择器 + 统计 -->
+    <div class="top-bar">
+      <div class="user-select-area">
+        <el-icon class="select-icon"><UserFilled /></el-icon>
+        <span class="select-label">查看用户：</span>
+        <el-select
+          v-model="selectedUser"
+          placeholder="选择用户"
+          filterable
+          size="large"
+          style="width: 220px"
+          @change="onUserChange"
+        >
+          <el-option label="全部用户（汇总）" value="" />
+          <el-option
+            v-for="u in userList"
+            :key="u.id"
+            :label="u.username"
+            :value="u.username"
+          />
+        </el-select>
+      </div>
+      <div class="top-actions">
+        <el-radio-group v-model="daysFilter" size="small" @change="onFilterChange">
+          <el-radio-button value="1">今天</el-radio-button>
+          <el-radio-button value="7">近7天</el-radio-button>
+          <el-radio-button value="30">近30天</el-radio-button>
+          <el-radio-button value="">全部时间</el-radio-button>
+        </el-radio-group>
+        <el-button size="small" @click="refreshData" circle><el-icon><Refresh /></el-icon></el-button>
+      </div>
+    </div>
+
+    <!-- 统计卡片 -->
     <div class="stats-row">
       <div class="stat-card">
         <div class="stat-icon" style="background:#ecf5ff;color:#409eff"><DataAnalysis /></div>
         <div class="stat-body">
           <div class="stat-value">{{ stats.total_count }}</div>
-          <div class="stat-label">总日志数</div>
+          <div class="stat-label">日志总数</div>
         </div>
       </div>
       <div class="stat-card">
@@ -20,8 +53,8 @@
       <div class="stat-card">
         <div class="stat-icon" style="background:#fdf6ec;color:#e6a23c"><UserFilled /></div>
         <div class="stat-body">
-          <div class="stat-value">{{ stats.active_users }}</div>
-          <div class="stat-label">活跃用户</div>
+          <div class="stat-value">{{ selectedUser ? 1 : stats.active_users }}</div>
+          <div class="stat-label">{{ selectedUser ? '当前用户' : '活跃用户数' }}</div>
         </div>
       </div>
       <div class="stat-card">
@@ -42,28 +75,21 @@
       </div>
     </div>
 
-    <!-- 内容区：筛选 + 表格 -->
+    <!-- 内容区 -->
     <div class="content-row">
-      <!-- 左侧：日志表格 -->
+      <!-- 日志表格 -->
       <div class="table-panel">
         <el-card shadow="never">
           <template #header>
             <div class="panel-header">
-              <span class="panel-title"><el-icon><List /></el-icon> 情绪日志</span>
+              <span class="panel-title">
+                <el-icon><List /></el-icon>
+                {{ selectedUser ? `${selectedUser} 的情绪日志` : '全部用户情绪日志' }}
+              </span>
               <div class="filter-bar">
-                <el-radio-group v-model="daysFilter" size="small" @change="onFilterChange">
-                  <el-radio-button value="">全部</el-radio-button>
-                  <el-radio-button value="1">今天</el-radio-button>
-                  <el-radio-button value="7">近7天</el-radio-button>
-                  <el-radio-button value="30">近30天</el-radio-button>
-                </el-radio-group>
-                <el-select v-model="selectedEmotion" placeholder="情绪" clearable size="small" style="width:120px" @change="onFilterChange">
+                <el-select v-model="selectedEmotion" placeholder="情绪筛选" clearable size="small" style="width:120px" @change="onFilterChange">
                   <el-option v-for="e in emotions" :key="e.value" :label="e.label" :value="e.value" />
                 </el-select>
-                <el-select v-model="selectedUser" placeholder="用户" clearable filterable size="small" style="width:140px" @change="onFilterChange">
-                  <el-option v-for="u in userList" :key="u.id" :label="u.username" :value="u.username" />
-                </el-select>
-                <el-button size="small" @click="refreshData" circle><el-icon><Refresh /></el-icon></el-button>
               </div>
             </div>
           </template>
@@ -74,7 +100,7 @@
                 <span class="time-text">{{ formatTime(row.timestamp) }}</span>
               </template>
             </el-table-column>
-            <el-table-column label="用户" width="120">
+            <el-table-column v-if="!selectedUser" label="用户" width="120">
               <template #default="{ row }">
                 <div class="user-chip">
                   <span class="user-avatar-dot" :style="{ background: stringToColor(row.username) }"></span>
@@ -105,7 +131,7 @@
         </el-card>
       </div>
 
-      <!-- 右侧：情绪分布 -->
+      <!-- 情绪分布 -->
       <div class="side-panel">
         <el-card shadow="never">
           <template #header>
@@ -115,7 +141,7 @@
             <div v-for="item in stats.emotion_distribution" :key="item.emotion" class="dist-item">
               <div class="dist-header">
                 <span>{{ getEmoji(item.emotion) }} {{ emotionLabel(item.emotion) }}</span>
-                <span class="dist-count">{{ item.count }}</span>
+                <span class="dist-count">{{ item.count }}次</span>
               </div>
               <div class="dist-bar-track">
                 <div class="dist-bar-fill" :style="{ width: distPercent(item.count) + '%', background: emotionColor(item.emotion) }"></div>
@@ -162,7 +188,11 @@ const emotions = [
 const fetchUserList = async () => {
   try {
     const res = await axios.get(`${API_BASE}/api/admin/users`)
-    userList.value = res.data.users || []
+    const users = res.data.users || []
+    userList.value = users
+    if (users.length && !selectedUser.value) {
+      selectedUser.value = users[0].username
+    }
   } catch { /* ignore */ }
 }
 
@@ -196,6 +226,7 @@ const fetchStats = async () => {
   } catch { /* ignore */ }
 }
 
+const onUserChange = () => { fetchLogs(1); fetchStats() }
 const onFilterChange = () => { fetchLogs(1); fetchStats() }
 const refreshData = () => { fetchLogs(currentPage.value); fetchStats(); ElMessage.success('已刷新') }
 
@@ -218,8 +249,8 @@ const stringToColor = str => {
   return '#' + ('00000' + (hash & 0x00FFFFFF).toString(16)).slice(-6)
 }
 
-onMounted(() => {
-  fetchUserList()
+onMounted(async () => {
+  await fetchUserList()
   fetchLogs(1)
   fetchStats()
 })
@@ -228,47 +259,42 @@ onMounted(() => {
 <style scoped>
 .logs-page { padding: 0; }
 
-/* ===== 统计卡片 ===== */
-.stats-row {
-  display: flex;
-  gap: 16px;
-  margin-bottom: 20px;
-}
-.stat-card {
-  flex: 1;
-  background: #fff;
-  border-radius: 12px;
-  padding: 18px 20px;
-  display: flex;
-  align-items: center;
-  gap: 14px;
+/* ===== 顶部栏 ===== */
+.top-bar {
+  display: flex; justify-content: space-between; align-items: center;
+  background: #fff; border-radius: 12px; padding: 16px 24px;
+  margin-bottom: 20px; border: 1px solid #ebeef5;
   box-shadow: 0 1px 3px rgba(0,0,0,.06);
-  border: 1px solid #ebeef5;
+}
+.user-select-area { display: flex; align-items: center; gap: 10px; }
+.select-icon { font-size: 20px; color: #409eff; }
+.select-label { font-size: 15px; font-weight: 600; color: #303133; }
+.top-actions { display: flex; align-items: center; gap: 10px; }
+
+/* ===== 统计卡片 ===== */
+.stats-row { display: flex; gap: 16px; margin-bottom: 20px; }
+.stat-card {
+  flex: 1; background: #fff; border-radius: 12px; padding: 18px 20px;
+  display: flex; align-items: center; gap: 14px;
+  box-shadow: 0 1px 3px rgba(0,0,0,.06); border: 1px solid #ebeef5;
   transition: transform .2s, box-shadow .2s;
 }
 .stat-card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,.1); }
 .stat-icon {
-  width: 48px; height: 48px;
-  border-radius: 12px;
-  display: flex; align-items: center; justify-content: center;
-  font-size: 22px;
-  flex-shrink: 0;
+  width: 48px; height: 48px; border-radius: 12px;
+  display: flex; align-items: center; justify-content: center; font-size: 22px; flex-shrink: 0;
 }
 .big-emoji { font-size: 24px; line-height: 1; }
 .stat-value { font-size: 24px; font-weight: 700; color: #303133; line-height: 1.2; }
 .stat-label { font-size: 13px; color: #909399; margin-top: 2px; }
 
-/* ===== 内容行 ===== */
+/* ===== 内容区 ===== */
 .content-row { display: flex; gap: 20px; align-items: flex-start; }
 .table-panel { flex: 1; min-width: 0; }
 .side-panel { width: 260px; flex-shrink: 0; }
 
-/* ===== 面板 ===== */
 :deep(.el-card__header) { padding: 14px 20px; }
-.panel-header {
-  display: flex; justify-content: space-between; align-items: center;
-  flex-wrap: wrap; gap: 10px;
-}
+.panel-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
 .panel-title { font-size: 15px; font-weight: 600; color: #303133; display: flex; align-items: center; gap: 6px; }
 .filter-bar { display: flex; align-items: center; gap: 8px; }
 
@@ -280,12 +306,10 @@ onMounted(() => {
 .score-cell { display: flex; align-items: center; gap: 10px; }
 .score-num { font-size: 12px; color: #909399; min-width: 36px; }
 
-/* ===== 分页 ===== */
 .pagination-wrap { margin-top: 16px; display: flex; justify-content: flex-end; }
 
 /* ===== 情绪分布 ===== */
 .dist-list { display: flex; flex-direction: column; gap: 14px; }
-.dist-item { }
 .dist-header { display: flex; justify-content: space-between; font-size: 13px; color: #606266; margin-bottom: 4px; }
 .dist-count { font-weight: 600; color: #303133; }
 .dist-bar-track { height: 8px; border-radius: 4px; background: #f0f0f0; overflow: hidden; }
