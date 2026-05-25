@@ -1760,6 +1760,7 @@ def _describe_action(action_type: str) -> str:
 @router.get("/api/admin/analytics/alerts")
 async def get_alert_feed(
     limit: int = 20,
+    days: Optional[int] = None,
     month: Optional[str] = None,
     user_id: Optional[int] = None,
     db: Session = Depends(get_db),
@@ -1771,7 +1772,7 @@ async def get_alert_feed(
     个人视图（有 user_id）：该用户的风险评估 + 该用户被监测期间的系统事件。
         用户无情绪数据 → 返回空（系统事件不属于该用户）。
     """
-    start_time, end_time = resolve_time_window(month=month)
+    start_time, end_time = resolve_time_window(days=days, month=month)
     now = datetime.now()
 
     alerts = []
@@ -1865,7 +1866,7 @@ async def get_alert_feed(
     risk_order = {"high": 0, "medium": 1, "low": 2}
     alerts.sort(key=lambda x: (risk_order.get(x["risk_level"], 3), x["timestamp"]))
 
-    return {"alerts": alerts[:limit]}
+    return {"alerts": alerts[:limit], "total": len(alerts)}
 
 
 @router.get("/api/admin/analytics/quadrant")

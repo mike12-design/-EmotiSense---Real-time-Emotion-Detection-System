@@ -54,6 +54,9 @@ const comprehensiveReport = ref(null);
 
 // 模块 1：高危预警台数据
 const alertFeed = ref([]);
+const alertLimit = ref(3);
+const alertDays = ref('7');
+const alertTotal = ref(0);
 
 // 模块 2：情绪轨迹图
 const trajectoryData = ref({
@@ -121,12 +124,26 @@ const fetchUserList = async () => {
 // ============ 获取高危预警数据 ============
 const fetchAlertFeed = async () => {
   try {
-    const res = await axios.get(`${API_BASE}/admin/analytics/alerts`);
+    const res = await axios.get(`${API_BASE}/admin/analytics/alerts`, {
+      params: {
+        limit: alertLimit.value,
+        days: alertDays.value
+      }
+    });
     alertFeed.value = res.data.alerts || [];
+    alertTotal.value = res.data.total || alertFeed.value.length;
   } catch (e) {
-    // 静默失败，不影响主功能
     console.error('警报数据加载失败:', e);
   }
+};
+
+const onAlertFilterChange = () => { fetchAlertFeed(); };
+
+const formatTimestamp = (ts) => {
+  if (!ts) return '--';
+  const d = new Date(ts);
+  const pad = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 };
 
 // ============ 获取情绪轨迹数据 ============
@@ -537,7 +554,6 @@ onUnmounted(() => {
 
       <!-- 模块 1：高危干预预警台 -->
       <el-row :gutter="16" class="module-row">
-        <!-- 实时警报滚动条 -->
         <el-col :span="24">
           <el-card class="alert-card" shadow="hover">
             <template #header>
@@ -545,10 +561,22 @@ onUnmounted(() => {
                 <el-icon><Warning /></el-icon>
                 <span>高危干预预警台</span>
                 <el-tag size="small" type="danger" v-if="alertFeed.length > 0">
-                  {{ alertFeed.length }} 条警报
+                  {{ alertTotal }} 条警报
                 </el-tag>
               </div>
             </template>
+
+            <!-- 时间筛选栏 -->
+            <div class="alert-filter-bar">
+              <span class="filter-label">时间范围：</span>
+              <el-radio-group v-model="alertDays" size="small" @change="onAlertFilterChange">
+                <el-radio-button value="1">今天</el-radio-button>
+                <el-radio-button value="7">近7天</el-radio-button>
+                <el-radio-button value="30">近30天</el-radio-button>
+              </el-radio-group>
+              <span class="filter-hint">显示最近 {{ alertLimit }} 条</span>
+            </div>
+
             <div class="alert-feed">
               <div v-if="alertFeed.length === 0" class="no-alerts">
                 <el-empty description="暂无警报" :image-size="60" />
@@ -562,7 +590,7 @@ onUnmounted(() => {
                 >
                   <div class="alert-time">
                     <el-icon><Timer /></el-icon>
-                    {{ alert.timestamp }}
+                    {{ formatTimestamp(alert.timestamp) }}
                   </div>
                   <div class="alert-content">
                     <span class="alert-icon">{{ getAlertIcon(alert.risk_level) }}</span>
@@ -880,8 +908,15 @@ onUnmounted(() => {
   margin-bottom: 16px;
 }
 
+.alert-filter-bar {
+  display: flex; align-items: center; gap: 12px;
+  padding: 8px 0 14px 0; border-bottom: 1px solid #ebeef5; margin-bottom: 12px;
+}
+.filter-label { font-size: 13px; color: #606266; }
+.filter-hint { font-size: 12px; color: #909399; margin-left: auto; }
+
 .alert-feed {
-  height: 300px;
+  max-height: 320px;
   overflow-y: auto;
 }
 
