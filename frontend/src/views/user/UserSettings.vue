@@ -4,7 +4,7 @@
     <!-- 第一行：安全与人脸 (原有功能) -->
     <el-row :gutter="20">
       <!-- 密码修改 -->
-      <el-col :span="10">
+      <el-col :span="12">
         <el-card header="安全设置" shadow="hover">
           <el-form label-position="top">
             <el-form-item label="旧密码"><el-input type="password" placeholder="请输入旧密码" /></el-form-item>
@@ -15,7 +15,7 @@
       </el-col>
 
       <!-- 人脸录入 -->
-      <el-col :span="14">
+      <el-col :span="12">
         <el-card header="生物特征管理" shadow="hover">
           <div class="face-section" v-loading="loading">
             <div v-if="hasFace">
@@ -46,57 +46,8 @@
         </el-card>
       </el-col>
     </el-row>
-    <!-- ⭐⭐⭐ 第三行：个性化设置 ⭐⭐⭐ -->
-<el-row :gutter="20" class="mt-20">
-  <el-col :span="24">
-    <el-card shadow="hover">
-      <template #header>
-        <div class="card-header">
-          <span><el-icon class="mr-2"><Picture /></el-icon>全局背景设置</span>
-        </div>
-      </template>
-      
-      <div class="bg-settings-box">
-        <!-- 预览 -->
-        <div class="preview-area">
-          <div 
-            class="preview-box" 
-            :style="{ backgroundImage: `url(${currentBg})` }"
-          >
-            <span v-if="!currentBg" class="no-bg-text">暂无背景</span>
-          </div>
-          <p class="text-center text-gray">当前背景预览</p>
-        </div>
 
-        <!-- 操作 -->
-        <div class="action-area">
-          <el-alert 
-            title="设置后将应用到全站背景" 
-            type="success" 
-            :closable="false" 
-            class="mb-3"
-          />
-          
-          <el-upload
-            action="#"
-            :http-request="handleBgUpload"
-            :show-file-list="false"
-            accept=".jpg,.jpeg,.png"
-          >
-            <el-button type="primary">上传新背景图片</el-button>
-          </el-upload>
-
-          <el-button type="danger" plain class="mt-3" @click="clearBackground">
-            恢复默认背景
-          </el-button>
-        </div>
-      </div>
-    </el-card>
-  </el-col>
-</el-row>
-
-
-    <!-- 第二行：资源管理 (新增模块) -->
+    <!-- 第二行：资源管理 -->
     <el-row :gutter="20" class="mt-20">
       
       <!-- 1. 音乐上传模块 -->
@@ -160,7 +111,7 @@
 </el-col>
 
       <!-- 2. 话术管理模块 -->
-      <el-col :span="14">
+      <el-col :span="12">
         <el-card shadow="hover">
           <template #header>
             <div class="card-header flex justify-between">
@@ -245,7 +196,6 @@
 
 <script setup>
 
-import { Picture } from '@element-plus/icons-vue';
 const userMusicList = ref([])
 import { ref, onMounted } from 'vue';
 import { 
@@ -258,8 +208,6 @@ import { ElMessage, ElMessageBox } from 'element-plus';
 // ===== 基础配置 =====
 const API_BASE = "http://127.0.0.1:8000";
 const username = localStorage.getItem('user') || 'admin';
-const currentBg = ref(localStorage.getItem('custom_bg') || '');
-
 // ===== 人脸识别相关变量 (原有) =====
 const dialogVisible = ref(false);
 const capturing = ref(false);
@@ -276,49 +224,6 @@ const scriptList = ref([]);
 const newScriptContent = ref('');
 const newScriptEmotion = ref('sad'); // 默认选中难过，因为这个最常用
 const scriptSubmitting = ref(false);
-// ===== 背景上传 =====
-const handleBgUpload = async (options) => {
-  const formData = new FormData();
-  formData.append("file", options.file);
-  formData.append("username", username);
-
-  try {
-    const res = await axios.post(`${API_BASE}/api/user/upload_background`, formData, {
-      headers: { "Content-Type": "multipart/form-data" }
-    });
-
-    if (res.data.success) {
-      const newUrl = res.data.url;
-      currentBg.value = newUrl;
-      localStorage.setItem('custom_bg', newUrl);
-      window.dispatchEvent(new Event('bg-changed'));
-      ElMessage.success("背景设置成功！");
-    }
-  } catch {
-    ElMessage.error("上传失败");
-  }
-};
-
-// Settings.vue 中的修改
-const clearBackground = async () => {
-  try {
-    // 1. 调用后端接口删除服务器上的图片文件
-    await axios.delete(`${API_BASE}/api/user/upload_background`, {
-      params: { username: username }
-    });
-
-    // 2. 清理前端预览状态和本地持久化缓存
-    currentBg.value = '';
-    localStorage.removeItem('custom_bg');
-
-    // 3. 💡 发送全局事件，通知 App.vue 立即更新背景
-    window.dispatchEvent(new Event('bg-changed'));
-
-    ElMessage.success("已恢复默认背景");
-  } catch (e) {
-    ElMessage.error("恢复默认背景失败");
-  }
-};
 
 // ==========================================
 // 1. 用户信息与人脸逻辑 (原有)
@@ -462,40 +367,6 @@ onMounted(() => {
 </script>
 
 <style scoped>
-
-.bg-settings-box {
-  display: flex;
-  gap: 30px;
-  align-items: center;
-}
-.preview-area {
-  width: 300px;
-}
-.preview-box {
-  width: 100%;
-  height: 170px;
-  border: 2px dashed #dcdfe6;
-  border-radius: 8px;
-  background-size: cover;
-  background-position: center;
-  background-color: #f5f7fa;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  margin-bottom: 10px;
-}
-.no-bg-text {
-  color: #909399;
-  font-size: 14px;
-}
-.text-gray {
-  color: #606266;
-  font-size: 12px;
-}
-.action-area {
-  flex: 1;
-}
-.mt-3 { margin-top: 12px; }
 
 .settings-container { padding: 20px; }
 .face-section { text-align: center; padding: 10px; min-height: 200px; }
