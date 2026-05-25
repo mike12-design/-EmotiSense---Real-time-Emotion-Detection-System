@@ -136,25 +136,36 @@
           <div class="card monitor-card">
             <div class="monitor-header">
               <div class="monitor-title-group">
-                <div class="pulse-dot"></div>
-                <h2 class="monitor-title">AI 视觉感知中</h2>
+                <div class="pulse-dot" :class="{ active: sensing }"></div>
+                <h2 class="monitor-title">{{ sensing ? 'AI 视觉感知中' : '感知待机中' }}</h2>
               </div>
               <transition name="fade" mode="out-in">
                 <span
+                  v-if="sensing"
                   :key="currentEmotion"
                   class="emotion-badge"
                   :style="{ backgroundColor: getEmotionColor(currentEmotion) }"
                 >
                   {{ getMoodEmoji(currentEmotion.toLowerCase()) }} {{ currentEmotion }}
                 </span>
+                <span v-else class="emotion-badge idle-badge">待机</span>
               </transition>
             </div>
 
             <div class="camera-container">
-              <img :src="`${API_BASE}/video_feed`" class="live-feed" alt="实时视频流" />
+              <img
+                v-if="sensing && feedReady"
+                :src="feedUrl"
+                class="live-feed"
+                alt="实时视频流"
+              />
+              <div v-else class="camera-placeholder">
+                <el-icon class="placeholder-icon"><VideoPause /></el-icon>
+                <span>点击「开启感知」启动情绪识别</span>
+              </div>
 
               <!-- HUD 装饰层 -->
-              <div class="hud-overlay">
+              <div v-if="sensing" class="hud-overlay">
                 <div class="scan-line"></div>
                 <div class="corner-tl"></div>
                 <div class="corner-tr"></div>
@@ -164,6 +175,15 @@
             </div>
 
             <div class="control-bar">
+              <el-button
+                class="btn-sense"
+                :type="sensing ? 'danger' : 'primary'"
+                size="small"
+                @click="toggleSensing"
+              >
+                <el-icon><component :is="sensing ? VideoPause : VideoPlay" /></el-icon>
+                {{ sensing ? '关闭感知' : '开启感知' }}
+              </el-button>
               <el-button class="btn-ctrl" size="small" @click="toggleFullscreen">
                 <el-icon><FullScreen /></el-icon>
                 {{ isFullscreen ? '退出全屏' : '全屏' }}
@@ -229,23 +249,23 @@ import screenfull from 'screenfull'
 import { ElMessage } from 'element-plus'
 import {
   HomeFilled, TrendCharts, Setting, InfoFilled, Calendar,
-  FullScreen, Edit, EditPen, ArrowRight, Camera
+  FullScreen, Edit, EditPen, ArrowRight, Camera, VideoPlay, VideoPause
 } from '@element-plus/icons-vue'
+import { useSensingStore } from '../../stores/sensing'
+import { storeToRefs } from 'pinia'
 
 const router = useRouter()
 const API_BASE = 'http://127.0.0.1:8000'
 
+const store = useSensingStore()
+const { sensing, currentEmotion, recentLogs, feedUrl, feedReady } = storeToRefs(store)
+
 /* ========= 状态变量 ========= */
 const isGuest = ref(true)
 const username = ref('')
-const currentEmotion = ref('Neutral')
-const isIntervening = ref(false)
-const recentLogs = ref([])
 const appRoot = ref(null)
 const isFullscreen = ref(false)
 const audioPlayer = ref(null)
-
-let pollingTimer = null
 
 // 日历相关
 const todayDate = new Date().getDate()
@@ -285,38 +305,26 @@ onMounted(() => {
     screenfull.on('change', () => { isFullscreen.value = screenfull.isFullscreen })
   }
 
-  pollingTimer = setInterval(fetchStatus, 2000)
+  store.setAudioPlayer(audioPlayer.value)
   fetchDiaries()
   fetchCalendarData()
 })
 
 onUnmounted(() => {
   if (screenfull.isEnabled) screenfull.off('change')
-  clearInterval(pollingTimer)
+  store.cleanup()
 })
 
-/* ========= 业务逻辑 ========= */
-const fetchStatus = async () => {
-  try {
-    const res = await axios.get(`${API_BASE}/api/status`)
-    const backendEmotion = res.data.current_emotion
-
-    if (backendEmotion) {
-      currentEmotion.value = backendEmotion
-    }
-
-    if (res.data.should_intervene) {
-      handleIntervention(res.data.resource)
-    }
-
-    if (Math.random() > 0.7) {
-      addLogToUI(currentEmotion.value)
-    }
-  } catch (e) {
-    // 静默失败
+/* ========= 感知控制 ========= */
+const toggleSensing = () => {
+  if (sensing.value) {
+    store.stopSensing()
+  } else {
+    store.startSensing()
   }
 }
 
+/* ========= 业务逻辑 ========= */
 const fetchDiaries = async () => {
   if (isGuest.value) return
   try {
@@ -364,30 +372,6 @@ const toggleFullscreen = () => {
   }
 }
 
-const addLogToUI = (emotion) => {
-  const now = new Date()
-  recentLogs.value.unshift({
-    id: Date.now(),
-    time: `${now.getHours()}:${now.getMinutes().toString().padStart(2,'0')}:${now.getSeconds().toString().padStart(2,'0')}`,
-    emotion: emotion,
-    score: 0.7 + Math.random() * 0.29
-  })
-  if (recentLogs.value.length > 10) recentLogs.value.pop()
-}
-
-const handleIntervention = (resource) => {
-  if (isIntervening.value) return
-  isIntervening.value = true
-
-  if (resource.audio_url && audioPlayer.value) {
-    audioPlayer.value.src = `${API_BASE}/${resource.audio_url}`
-    audioPlayer.value.play()
-  }
-
-  setTimeout(() => {
-    isIntervening.value = false
-  }, 5000)
-}
 </script>
 
 <style scoped>
@@ -832,8 +816,12 @@ const handleIntervention = (resource) => {
 .pulse-dot {
   width: 10px;
   height: 10px;
-  background: linear-gradient(135deg, #34d399, #10b981);
+  background: #d1d5db;
   border-radius: 50%;
+  box-shadow: none;
+}
+.pulse-dot.active {
+  background: linear-gradient(135deg, #34d399, #10b981);
   animation: pulse-dot 2s infinite;
   box-shadow: 0 0 12px rgba(16, 185, 129, 0.5);
 }
@@ -861,6 +849,11 @@ const handleIntervention = (resource) => {
   align-items: center;
   gap: 6px;
 }
+.idle-badge {
+  background: #d1d5db !important;
+  color: #6b7280;
+  box-shadow: none;
+}
 
 /* 相机容器 */
 .camera-container {
@@ -869,6 +862,23 @@ const handleIntervention = (resource) => {
   position: relative;
   overflow: hidden;
   min-height: 300px;
+}
+
+.camera-placeholder {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  color: #6b7280;
+  font-size: 14px;
+  background: #1a1a2e;
+}
+.placeholder-icon {
+  font-size: 48px;
+  opacity: 0.5;
 }
 
 .live-feed {
@@ -913,6 +923,13 @@ const handleIntervention = (resource) => {
   padding: 12px 20px;
   background: white;
   border-top: 1px solid var(--border-light);
+  display: flex;
+  gap: 10px;
+}
+
+.btn-sense {
+  border: none;
+  font-weight: 600;
 }
 
 .btn-ctrl {

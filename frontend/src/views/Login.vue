@@ -1,99 +1,116 @@
 <!-- frontend/src/views/Login.vue -->
 <template>
-  <div class="login-container">
-    <!-- 装饰性背景元素 -->
-    <div class="bg-decoration">
-      <div class="bubble bubble-1"></div>
-      <div class="bubble bubble-2"></div>
-      <div class="bubble bubble-3"></div>
-      <div class="bubble bubble-4"></div>
-    </div>
+  <div class="login-page">
+    <div class="login-bg" aria-hidden="true"></div>
 
-    <div class="login-box animate-fade-in-up">
-      <!-- Logo 区域 -->
-      <div class="logo-section">
-        <div class="logo-icon animate-float">
-          <span class="emoji">💙</span>
+    <header class="login-header" aria-label="branding">
+      <div class="brand-left">
+        <img class="brand-logo" :src="brandLogoUrl" alt="EmotiSense" />
+        <span class="brand-name">EmotiSense</span>
+      </div>
+      <div class="brand-right">
+        <span class="brand-pill">Real-time Emotion Detection</span>
+      </div>
+    </header>
+
+    <main class="login-main">
+      <section class="login-left" aria-label="intro">
+        <div class="left-inner">
+          <div class="left-wave" aria-hidden="true">
+            <span class="bar b1"></span>
+            <span class="bar b2"></span>
+            <span class="bar b3"></span>
+            <span class="bar b4"></span>
+            <span class="bar b5"></span>
+            <span class="bar b6"></span>
+            <span class="bar b7"></span>
+            <span class="bar b8"></span>
+            <span class="bar b9"></span>
+            <span class="bar b10"></span>
+            <span class="bar b11"></span>
+            <span class="bar b12"></span>
+            <span class="bar b13"></span>
+            <span class="bar b14"></span>
+            <span class="bar b15"></span>
+            <span class="bar b16"></span>
+            <span class="bar b17"></span>
+            <span class="bar b18"></span>
+            <span class="bar b19"></span>
+            <span class="bar b20"></span>
+            <span class="bar b21"></span>
+            <span class="bar b22"></span>
+            <span class="bar b23"></span>
+            <span class="bar b24"></span>
+          </div>
         </div>
-        <h1 class="title">EmotiSense</h1>
-        <p class="subtitle">实时情绪感知系统</p>
-      </div>
+      </section>
 
-      <!-- 表单区域 -->
-      <el-form :model="form" class="login-form" size="large">
-        <el-form-item>
-          <el-input
-            v-model="form.username"
-            placeholder="请输入用户名"
-            :prefix-icon="User"
-            class="soft-input"
-          />
-        </el-form-item>
+      <section class="login-panel" :class="{ 'is-register': !isLogin }" aria-label="login panel">
+        <div class="panel-title">
+          <h1 class="panel-h1">{{ isLogin ? 'Sign in' : 'Create account' }}</h1>
+          <p class="panel-sub">{{ isLogin ? '欢迎回来' : '开启情绪之旅' }}</p>
+        </div>
 
-        <el-form-item>
-          <el-input
-            v-model="form.password"
-            type="password"
-            placeholder="请输入密码"
-            :prefix-icon="Lock"
-            show-password
-            class="soft-input"
-            @keyup.enter="handleSubmit"
-          />
-        </el-form-item>
+        <el-form :model="form" class="panel-form" size="large">
+          <el-form-item>
+            <el-input
+              v-model="form.username"
+              placeholder="用户名"
+              :prefix-icon="User"
+              class="panel-input"
+            />
+          </el-form-item>
 
-        <!-- 注册模式下多一个确认密码 -->
-        <el-form-item v-if="!isLogin">
-          <el-input
-            v-model="form.confirmPassword"
-            type="password"
-            placeholder="请再次输入密码"
-            :prefix-icon="Lock"
-            show-password
-            class="soft-input"
-          />
-        </el-form-item>
+          <el-form-item>
+            <el-input
+              v-model="form.password"
+              type="password"
+              placeholder="密码"
+              :prefix-icon="Lock"
+              show-password
+              class="panel-input"
+              @keyup.enter="handleSubmit"
+            />
+          </el-form-item>
 
-        <!-- 提交按钮 -->
-        <el-button
-          type="primary"
-          class="login-btn animate-scale-in"
-          @click="handleSubmit"
-          :loading="loading"
-          size="large"
-        >
-          <span class="btn-content">
-            {{ isLogin ? ' welcomes 回来' : '开启情绪之旅' }}
-          </span>
-        </el-button>
-      </el-form>
+          <el-form-item v-if="!isLogin">
+            <el-input
+              v-model="form.confirmPassword"
+              type="password"
+              placeholder="确认密码"
+              :prefix-icon="Lock"
+              show-password
+              class="panel-input"
+              @keyup.enter="handleSubmit"
+            />
+          </el-form-item>
 
-      <!-- 切换模式 -->
-      <div class="mode-switch">
-        <span class="switch-text">
-          {{ isLogin ? '还没有账号？' : '已有账号？' }}
-        </span>
-        <el-link
-          class="switch-link"
-          type="primary"
-          @click="toggleMode"
-          :underline="false"
-        >
-          {{ isLogin ? '立即注册' : '返回登录' }}
-        </el-link>
-      </div>
+          <el-button
+            type="primary"
+            class="panel-btn"
+            @click="handleSubmit"
+            :loading="loading"
+            size="large"
+          >
+            {{ isLogin ? '登录' : '注册' }}
+          </el-button>
+        </el-form>
 
-      <!-- 登录提示 -->
-      <div v-if="isLogin" class="tips">
-        <el-divider direction="horizontal" class="tips-divider">
-          <span class="divider-text">提示</span>
-        </el-divider>
-        <p class="tips-text">
-          <el-icon class="tips-icon"><InfoFilled /></el-icon>
-          管理员账号：<code>admin</code> / <code>123456</code>
-        </p>
-      </div>
-    </div>
+        <div class="panel-footer">
+          <div class="mode-switch">
+            <span class="switch-text">{{ isLogin ? '还没有账号？' : '已有账号？' }}</span>
+            <el-link class="switch-link" type="primary" @click="toggleMode" :underline="false">
+              {{ isLogin ? '立即注册' : '返回登录' }}
+            </el-link>
+          </div>
+
+          <p v-if="isLogin" class="admin-hint">
+            <el-icon class="hint-icon"><InfoFilled /></el-icon>
+            管理员：<code>admin</code>/<code>123456</code>
+          </p>
+        </div>
+      </section>
+    </main>
   </div>
 </template>
 
@@ -103,6 +120,8 @@ import { useRouter } from 'vue-router';
 import { User, Lock, InfoFilled } from '@element-plus/icons-vue';
 import { ElMessage } from 'element-plus';
 import axios from 'axios';
+
+import brandLogoUrl from '../assets/logo.svg';
 
 const router = useRouter();
 const loading = ref(false);
@@ -209,292 +228,374 @@ const handleSubmit = async () => {
 </script>
 
 <style scoped>
-/* ===== 主容器 ===== */
-.login-container {
+/* ================================================================
+   Design Language: "Breath" -- 呼吸感，统一亮色风格
+   ================================================================ */
+
+.login-page {
   height: 100vh;
   width: 100vw;
-  display: flex;
-  justify-content: center;
-  align-items: center;
   position: fixed;
-  top: 0;
-  left: 0;
+  inset: 0;
   overflow: hidden;
-
-  /* 柔和渐变背景 */
-  background: linear-gradient(135deg,
-    #f0f9ff 0%,
-    #e0f2fe 25%,
-    #bae6fd 50%,
-    #e0f2fe 75%,
-    #fafafc 100%
-  );
-  background-size: 200% 200%;
-  animation: gradientShift 15s ease infinite;
+  background: #f2f6fa;
+  color: #1e293b;
 }
 
-@keyframes gradientShift {
-  0%, 100% { background-position: 0% 50%; }
-  50% { background-position: 100% 50%; }
-}
-
-/* ===== 背景装饰气泡 ===== */
-.bg-decoration {
+.login-bg {
   position: absolute;
-  width: 100%;
-  height: 100%;
-  pointer-events: none;
-  overflow: hidden;
+  inset: 0;
+  background:
+    radial-gradient(ellipse 70% 50% at 30% 0%, rgba(56,189,248,.06) 0%, transparent 55%),
+    radial-gradient(ellipse 60% 60% at 80% 90%, rgba(14,165,233,.04) 0%, transparent 55%),
+    radial-gradient(ellipse 50% 40% at 50% 50%, rgba(255,255,255,.5) 0%, transparent 70%);
 }
 
-.bubble {
+.login-bg::after {
+  display: none;
+}
+
+.login-bg::before {
+  content: '';
   position: absolute;
-  border-radius: 50%;
-  background: linear-gradient(
-    135deg,
-    rgba(14, 165, 233, 0.15),
-    rgba(56, 189, 248, 0.1)
-  );
-  animation: floatUp infinite ease-in-out;
+  inset: 0;
+  opacity: 0.35;
+  background:
+    radial-gradient(circle at 12% 64%, rgba(34, 197, 94, 0.08) 0%, transparent 46%),
+    radial-gradient(circle at 22% 72%, rgba(96, 165, 250, 0.07) 0%, transparent 52%),
+    radial-gradient(circle at 33% 78%, rgba(248, 113, 113, 0.06) 0%, transparent 48%),
+    radial-gradient(circle at 44% 72%, rgba(244, 114, 182, 0.06) 0%, transparent 52%),
+    radial-gradient(circle at 56% 78%, rgba(251, 146, 60, 0.06) 0%, transparent 50%),
+    radial-gradient(circle at 70% 74%, rgba(163, 230, 53, 0.05) 0%, transparent 52%);
+  mix-blend-mode: screen;
+  animation: emotionDrift 10s ease-in-out infinite;
 }
 
-.bubble-1 {
-  width: 200px;
-  height: 200px;
-  left: 10%;
-  bottom: -200px;
-  animation-delay: 0s;
-  animation-duration: 8s;
-}
-
-.bubble-2 {
-  width: 150px;
-  height: 150px;
-  left: 70%;
-  bottom: -150px;
-  animation-delay: 2s;
-  animation-duration: 10s;
-}
-
-.bubble-3 {
-  width: 100px;
-  height: 100px;
-  left: 40%;
-  bottom: -100px;
-  animation-delay: 4s;
-  animation-duration: 12s;
-}
-
-.bubble-4 {
-  width: 180px;
-  height: 180px;
-  left: 85%;
-  bottom: -180px;
-  animation-delay: 1s;
-  animation-duration: 9s;
-}
-
-@keyframes floatUp {
-  0%, 100% {
-    transform: translateY(0) rotate(0deg);
-    opacity: 0.6;
+@keyframes emotionDrift {
+  0% {
+    transform: translate3d(0, 0, 0) scale(1);
+    opacity: 0.28;
   }
   50% {
-    transform: translateY(-100vh) rotate(180deg);
-    opacity: 0.3;
+    transform: translate3d(-10px, -8px, 0) scale(1.03);
+    opacity: 0.42;
+  }
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+    opacity: 0.30;
   }
 }
 
-/* ===== 登录卡片 ===== */
-.login-box {
-  width: 420px;
-  padding: 48px 40px;
-  background: rgba(255, 255, 255, 0.85);
-  backdrop-filter: blur(20px);
-  border-radius: 24px;
-  border: 1px solid rgba(255, 255, 255, 0.6);
-  box-shadow:
-    0 20px 60px rgba(14, 165, 233, 0.1),
-    0 0 0 1px rgba(14, 165, 233, 0.05);
+.login-header {
   position: relative;
-  z-index: 1;
-}
-
-/* ===== Logo 区域 ===== */
-.logo-section {
-  text-align: center;
-  margin-bottom: 40px;
-}
-
-.logo-icon {
-  width: 80px;
-  height: 80px;
-  margin: 0 auto 20px;
-  background: linear-gradient(135deg, #e0f2fe, #bae6fd);
-  border-radius: 50%;
+  z-index: 2;
   display: flex;
   align-items: center;
-  justify-content: center;
-  box-shadow: 0 8px 24px rgba(14, 165, 233, 0.15);
+  justify-content: space-between;
+  padding: 26px 34px;
 }
 
-.logo-icon .emoji {
-  font-size: 40px;
+.brand-left {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
 }
 
-.title {
-  font-size: 32px;
+.brand-logo {
+  width: 28px;
+  height: 28px;
+}
+
+.brand-name {
   font-weight: 700;
-  color: var(--text-primary);
-  margin: 0 0 8px 0;
-  background: linear-gradient(135deg, #0ea5e9, #0284c7);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-  letter-spacing: -0.5px;
-}
-
-.subtitle {
+  letter-spacing: 0.6px;
   font-size: 14px;
-  color: var(--text-tertiary);
-  margin: 0;
-  font-weight: 400;
+  text-transform: uppercase;
+  color: #1e293b;
 }
 
-/* ===== 表单样式 ===== */
-.login-form {
-  margin-top: 32px;
+.brand-right {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.brand-pill {
+  font-size: 12px;
+  letter-spacing: 0.32em;
+  text-transform: uppercase;
+  color: #64748b;
+}
+
+.login-main {
+  position: relative;
+  z-index: 2;
+  height: calc(100vh - 82px);
+  display: grid;
+  grid-template-columns: minmax(520px, 1.55fr) minmax(360px, 440px);
+  align-items: center;
+  gap: 18px;
+  padding: 0 56px 48px;
+}
+
+.login-left {
+  justify-self: start;
+  width: 100%;
+}
+
+.left-inner {
+  width: 100%;
+  padding-left: 6px;
+}
+
+.left-wave {
+  margin-top: 0;
+  height: 200px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 6px;
+  opacity: 0.45;
+}
+
+.bar {
+  width: clamp(10px, 1.25vw, 16px);
+  flex: 1 1 0;
+  height: 100px;
+  border-radius: 10px;
+  background: linear-gradient(180deg, rgba(14,165,233,0.55), rgba(56,189,248,0.12));
+  box-shadow: 0 10px 30px rgba(14,165,233,0.08);
+  transform-origin: center bottom;
+  transform: scaleY(var(--wave-min, 0.2));
+  animation: waveScale 7.2s ease-in-out infinite;
+  will-change: transform;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bar {
+    animation: none;
+    transform: scaleY(0.35);
+  }
+}
+
+/* Sea-wave feel: long periods + phase shifts, smooth group swells */
+.b1 { animation-duration: 20s; animation-delay: -0s; }
+.b2 { animation-duration: 20s; animation-delay: -0.45s; }
+.b3 { animation-duration: 20s; animation-delay: -0.9s; }
+.b4 { animation-duration: 20s; animation-delay: -1.35s; }
+.b5 { animation-duration: 20s; animation-delay: -1.8s; }
+.b6 { animation-duration: 20s; animation-delay: -2.25s; }
+.b7 { animation-duration: 20s; animation-delay: -2.7s; }
+.b8 { animation-duration: 20s; animation-delay: -3.15s; }
+.b9 { animation-duration: 20s; animation-delay: -3.6s; }
+.b10 { animation-duration: 20s; animation-delay: -4.05s; }
+.b11 { animation-duration: 20s; animation-delay: -4.5s; }
+.b12 { animation-duration: 20s; animation-delay: -4.95s; }
+.b13 { animation-duration: 20s; animation-delay: -5.4s; }
+.b14 { animation-duration: 20s; animation-delay: -5.85s; }
+.b15 { animation-duration: 20s; animation-delay: -6.3s; }
+.b16 { animation-duration: 20s; animation-delay: -6.75s; }
+.b17 { animation-duration: 20s; animation-delay: -7.2s; }
+.b18 { animation-duration: 20s; animation-delay: -7.65s; }
+.b19 { animation-duration: 20s; animation-delay: -8.1s; }
+.b20 { animation-duration: 20s; animation-delay: -8.55s; }
+.b21 { animation-duration: 20s; animation-delay: -9.0s; }
+.b22 { animation-duration: 20s; animation-delay: -9.45s; }
+.b23 { animation-duration: 20s; animation-delay: -9.9s; }
+.b24 { animation-duration: 20s; animation-delay: -10.35s; }
+
+/* Occasional group swell (emotion peak): center + right groups */
+.b8, .b9, .b10, .b11, .b12, .b13, .b14, .b15 {
+  animation-name: waveScale, peakBoost;
+  animation-duration: inherit, 46s;
+  animation-timing-function: ease-in-out, ease-in-out;
+  animation-iteration-count: infinite, infinite;
+  animation-delay: inherit, -12s;
+}
+
+.b16, .b17, .b18, .b19 {
+  animation-name: waveScale, peakBoost;
+  animation-duration: inherit, 58s;
+  animation-timing-function: ease-in-out, ease-in-out;
+  animation-iteration-count: infinite, infinite;
+  animation-delay: inherit, -26s;
+}
+
+@keyframes waveScale {
+  0%, 100% {
+    transform: scaleY(0.12);
+    opacity: 0.35;
+  }
+  50% {
+    transform: scaleY(0.92);
+    opacity: 0.72;
+  }
+}
+
+@keyframes peakBoost {
+  0%, 78%, 100% {
+    filter: brightness(1);
+  }
+  84% {
+    filter: brightness(1.06);
+  }
+  90% {
+    filter: brightness(1.15);
+  }
+  95% {
+    filter: brightness(1.04);
+  }
+}
+
+.login-panel {
+  width: min(440px, calc(100vw - 64px));
+  padding: 34px 32px 26px;
+  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  border-radius: 20px;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.8),
+    0 2px 16px rgba(14, 165, 233, 0.06),
+    0 1px 2px rgba(0, 0, 0, 0.04);
+  margin-left: 0;
+}
+
+.panel-title {
+  margin-bottom: 18px;
+}
+
+.panel-h1 {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: #1e293b;
+}
+
+.panel-sub {
+  margin: 6px 0 0;
+  font-size: 13px;
+  color: #64748b;
+}
+
+.panel-form {
+  margin-top: 18px;
 }
 
 :deep(.el-form-item) {
-  margin-bottom: 20px;
+  margin-bottom: 14px;
 }
 
-:deep(.el-input__wrapper) {
-  padding: 14px 18px;
+:deep(.panel-input .el-input__wrapper) {
+  border-radius: 12px;
+  padding: 12px 14px;
   background: rgba(255, 255, 255, 0.8);
-  border-radius: 14px;
-  box-shadow: 0 0 0 1px rgba(14, 165, 233, 0.08) inset;
-  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.08) inset;
+  transition: box-shadow 180ms ease, background 180ms ease;
 }
 
-:deep(.el-input__wrapper:hover) {
-  box-shadow: 0 0 0 1px rgba(14, 165, 233, 0.2) inset;
+:deep(.panel-input .el-input__wrapper:hover) {
+  background: rgba(255, 255, 255, 0.95);
+  box-shadow: 0 0 0 1px rgba(14, 165, 233, 0.3) inset;
 }
 
-:deep(.el-input__wrapper.is-focus) {
+:deep(.panel-input .el-input__wrapper.is-focus) {
+  background: #fff;
   box-shadow:
-    0 0 0 1px rgba(14, 165, 233, 0.4) inset,
-    0 4px 12px rgba(14, 165, 233, 0.1);
+    0 0 0 1px rgba(14, 165, 233, 0.5) inset,
+    0 4px 16px rgba(14, 165, 233, 0.08);
 }
 
-:deep(.el-input__inner) {
-  font-size: 15px;
-  color: var(--text-primary);
+:deep(.panel-input .el-input__inner) {
+  color: #1e293b;
 }
 
-:deep(.el-input__prefix) {
-  color: var(--primary-400);
+:deep(.panel-input .el-input__prefix) {
+  color: #94a3b8;
 }
 
-/* ===== 按钮样式 ===== */
-.login-btn {
+.panel-btn {
+  margin-top: 12px;
   width: 100%;
-  height: 52px;
-  margin-top: 24px;
-  border-radius: 14px;
-  font-size: 16px;
-  font-weight: 600;
-  background: linear-gradient(135deg, #0ea5e9, #0284c7);
+  height: 44px;
   border: none;
-  box-shadow:
-    0 4px 16px rgba(14, 165, 233, 0.3),
-    0 2px 8px rgba(14, 165, 233, 0.2);
-  transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  border-radius: 999px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  background: linear-gradient(135deg, #38bdf8, #0ea5e9);
+  box-shadow: 0 4px 16px rgba(14, 165, 233, 0.25);
 }
 
-.login-btn:hover {
-  background: linear-gradient(135deg, #0284c7, #0369a1);
-  transform: translateY(-2px);
-  box-shadow:
-    0 8px 24px rgba(14, 165, 233, 0.4),
-    0 4px 12px rgba(14, 165, 233, 0.25);
+.panel-btn:hover {
+  box-shadow: 0 6px 24px rgba(14, 165, 233, 0.35);
+  transform: translateY(-1px);
 }
 
-.login-btn:active {
-  transform: translateY(0);
+.panel-footer {
+  margin-top: 16px;
 }
 
-.btn-content {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-/* ===== 模式切换 ===== */
 .mode-switch {
-  margin-top: 28px;
-  text-align: center;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: 10px;
 }
 
 .switch-text {
-  font-size: 14px;
-  color: var(--text-secondary);
+  font-size: 13px;
+  color: #64748b;
 }
 
 .switch-link {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--primary-500);
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.switch-link:hover {
-  color: var(--primary-600);
-}
-
-/* ===== 提示区域 ===== */
-.tips {
-  margin-top: 24px;
-  text-align: center;
-}
-
-.tips-divider {
-  margin: 0 0 12px 0;
-}
-
-:deep(.el-divider__text) {
-  font-size: 12px;
-  color: var(--text-tertiary);
-  font-weight: 500;
-}
-
-.tips-text {
   font-size: 13px;
-  color: var(--text-tertiary);
-  margin: 0;
+  font-weight: 700;
+}
+
+.admin-hint {
+  margin: 14px 0 0;
+  font-size: 12px;
+  color: #94a3b8;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 6px;
 }
 
-.tips-icon {
+.hint-icon {
   font-size: 14px;
-  color: var(--primary-400);
+  color: #94a3b8;
 }
 
-.tips-text code {
-  background: var(--primary-50);
-  padding: 2px 8px;
-  border-radius: 6px;
-  font-size: 12px;
-  color: var(--primary-600);
-  font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
+.admin-hint code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+  background: rgba(0, 0, 0, 0.05);
+  padding: 2px 7px;
+  border-radius: 8px;
+  margin: 0 2px;
+  color: #1e293b;
+}
+
+@media (max-width: 720px) {
+  .login-header {
+    padding: 18px 16px;
+  }
+
+  .login-main {
+    padding: 0 16px 28px;
+    grid-template-columns: 1fr;
+    gap: 18px;
+    justify-items: center;
+  }
+
+  .login-left {
+    display: none;
+  }
+
+  .brand-pill {
+    display: none;
+  }
 }
 </style>

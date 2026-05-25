@@ -11,26 +11,27 @@
             <transition name="fade-transform" mode="out-in">
               <!-- 使用 :key 绑定 quote 内容，确保内容变化时触发过渡动画 -->
               <div :key="quote" class="quote-wrap">
-                <el-tag 
-                  size="small" 
-                  :type="quoteSource === 'hitokoto' ? 'success' : 'warning'" 
+                <el-tag
+                  v-if="quoteEmotion"
+                  size="small"
+                  type="warning"
                   effect="plain"
                   class="source-tag"
                 >
-                  {{ quoteSource === 'hitokoto' ? '一言' : '心语' }}
+                  {{ quoteEmotion }}
                 </el-tag>
-                <span class="quote-text">“{{ quote || '正在为你寻觅动人的文字...' }}”</span>
+                <span class="quote-text">"{{ quote || '正在为你寻觅动人的文字...' }}"</span>
               </div>
             </transition>
             
-            <!-- “换一个” 按钮 -->
+            <!-- "换一个" 按钮 -->
             <el-button 
               type="primary" 
               link 
               :icon="Refresh" 
               class="refresh-btn" 
               :loading="quoteLoading"
-              @click="fetchMixedQuote"
+              @click="fetchMatchedQuote"
             >
               换一个
             </el-button>
@@ -73,10 +74,16 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed, onUnmounted, nextTick } from 'vue';
-import { Refresh } from '@element-plus/icons-vue'; // 引入刷新图标
+import { ref, onMounted, computed, onUnmounted, nextTick, watch } from 'vue';
+import { Refresh } from '@element-plus/icons-vue';
 import * as echarts from 'echarts';
 import axios from 'axios';
+import { useSensingStore } from '../../stores/sensing';
+import { storeToRefs } from 'pinia';
+
+const store = useSensingStore();
+const { currentEmotion } = storeToRefs(store);
+const { getMoodLabel } = store;
 
 // --- 状态定义 ---
 const username = localStorage.getItem('user') || 'User';
@@ -85,7 +92,7 @@ const totalRecords = ref(0);
 const pieChartRef = ref(null);
 const moodData = ref({});
 const quote = ref('');
-const quoteSource = ref('local'); 
+const quoteEmotion = ref('');
 const quoteLoading = ref(false);
 let myChart = null;
 
@@ -107,43 +114,30 @@ const greeting = computed(() => {
   return h < 6 ? '凌晨好' : h < 12 ? '早安' : h < 18 ? '午安' : '晚安';
 });
 
-// --- 核心方法：换一个 (1:1 混合) ---
-const fetchMixedQuote = async () => {
+// 监听情绪变化，自动刷新匹配话术
+watch(currentEmotion, (newEmotion) => {
+  if (newEmotion && newEmotion !== 'Neutral') {
+    fetchMatchedQuote();
+  }
+});
+
+// --- 核心方法：根据当前情绪匹配用户上传的话术 ---
+const fetchMatchedQuote = async () => {
   if (quoteLoading.value) return;
   quoteLoading.value = true;
 
-  // 1:1 概率决定去向
-  const isHitokotoTurn = Math.random() > 0.5; 
-  
   try {
-    let res;
-    if (isHitokotoTurn) {
-      // 尝试获取个性化一言 (后端逻辑：根据最近心情推荐)
-      res = await axios.get(`${API_BASE}/api/my/personalized_quote`, { 
-        params: { username },
-        timeout: 2500 // 一言接口响应慢时快速跳入 catch
-      });
-    } else {
-      // 尝试获取本地话术
-      res = await axios.get(`${API_BASE}/api/admin/scripts/daily`);
-    }
-
+    const res = await axios.get(`${API_BASE}/api/my/personalized_quote`, {
+      params: { username, emotion: currentEmotion.value }
+    });
     quote.value = res.data.content;
-    quoteSource.value = res.data.source; // 后端需返回 source 字段
+    quoteEmotion.value = res.data.emotion_label || getMoodLabel(res.data.emotion || currentEmotion.value);
   } catch (e) {
-    console.warn("API请求失败，切换本地兜底");
-    // 失败重试本地话术
-    try {
-      const fallback = await axios.get(`${API_BASE}/api/admin/scripts/daily`);
-      quote.value = fallback.data.content;
-      quoteSource.value = 'local';
-    } catch (err) {
-      quote.value = "生活总是充满希望，记得给自己一个微笑。";
-      quoteSource.value = 'local';
-    }
+    console.warn('话术匹配失败，使用兜底');
+    quote.value = '生活总是充满希望，记得给自己一个微笑。';
+    quoteEmotion.value = '';
   } finally {
-    // 稍微延迟关闭 loading 效果，防止动画太快看不清
-    setTimeout(() => { quoteLoading.value = false; }, 300);
+    quoteLoading.value = false;
   }
 };
 
@@ -188,7 +182,7 @@ const initPieChart = (data) => {
 const handleResize = () => myChart && myChart.resize();
 
 onMounted(() => {
-  fetchMixedQuote();
+  fetchMatchedQuote();
   fetchData();
   window.addEventListener('resize', handleResize);
 });
