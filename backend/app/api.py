@@ -1942,13 +1942,13 @@ async def get_quadrant_data(db: Session = Depends(get_db)):
 
 
 @router.get("/api/admin/analytics/system-health")
-async def get_system_health(user_id: int = None, month: Optional[str] = None, db: Session = Depends(get_db)):
+async def get_system_health(user_id: int = None, days: int = 7, month: Optional[str] = None, db: Session = Depends(get_db)):
     """
     获取 AI 系统健康度数据（支持按用户筛选）
 
     - 情绪类别占比
     """
-    cutoff, end_time = resolve_time_window(days=1, month=month)
+    cutoff, end_time = resolve_time_window(days=days, month=month)
 
     query = db.query(EmotionLog).filter(
         EmotionLog.timestamp >= cutoff,

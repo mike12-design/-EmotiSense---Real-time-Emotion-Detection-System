@@ -166,8 +166,13 @@ const fetchComprehensiveReport = async () => {
 
 // ============ 获取 AI 系统健康度数据 ============
 const fetchSystemHealth = async () => {
+  if (!selectedUserId.value) return;
+
   try {
-    const res = await axios.get(`${API_BASE}/admin/analytics/system-health`);
+    const days = timeRange.value === '24h' ? 1 : timeRange.value === '7d' ? 7 : 30;
+    const res = await axios.get(`${API_BASE}/admin/analytics/system-health`, {
+      params: { user_id: selectedUserId.value, days }
+    });
     systemHealth.value = res.data;
     renderEmotionPieChart(systemHealth.value.emotionPieData || []);
   } catch (e) {
@@ -398,11 +403,12 @@ const getAlertIcon = (level) => {
 };
 
 // 生命周期
-onMounted(() => {
-  fetchCurrentUser();
+onMounted(async () => {
+  await fetchCurrentUser();
   fetchUserList();
   fetchAlertFeed();
 
+  fetchTrajectoryData();
   fetchSystemHealth();
   window.addEventListener('resize', handleResize);
 
