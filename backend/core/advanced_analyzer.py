@@ -120,8 +120,8 @@ class AdvancedEmotionAnalyzer:
             # 1. 获取基础效价
             valence = self.valence_map(emotion)
 
-            # 2. 计算最终情绪值：V_final = Valence × (score / 100)
-            normalized_score = score / 100.0
+            # 2. 计算最终情绪值：V_final = Valence × score (score 已是 0-1)
+            normalized_score = score
             v_final = valence * normalized_score
 
             timestamps.append(timestamp)
