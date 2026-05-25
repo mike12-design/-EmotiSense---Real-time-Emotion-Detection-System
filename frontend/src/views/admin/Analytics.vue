@@ -425,10 +425,10 @@ const getAlertIcon = (level) => {
 
 // 生命周期
 onMounted(async () => {
-  // 默认近7天
+  // 默认近3天
   const end = new Date();
   const start = new Date();
-  start.setDate(start.getDate() - 7);
+  start.setDate(start.getDate() - 3);
   alertDateRange.value = [start, end];
 
   await fetchCurrentUser();
