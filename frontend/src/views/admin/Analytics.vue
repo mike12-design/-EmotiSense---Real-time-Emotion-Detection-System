@@ -141,7 +141,7 @@ const fetchTrajectoryData = async () => {
     const valenceHistory = res.data.valence_history || [];
     trajectoryData.value = {
       scatterPoints: valenceHistory.map((p, i) => [i, p.value]),
-      smoothedLine: res.data.smoothed_valence || [],
+      smoothedLine: (res.data.smoothed_valence || []).map(p => p[1]),
       attractor: res.data.attractor || 0,
       std: res.data.attractor_std || 1
     };
