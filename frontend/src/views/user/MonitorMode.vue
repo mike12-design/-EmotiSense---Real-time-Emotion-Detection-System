@@ -155,6 +155,16 @@
                 <el-icon><FullScreen /></el-icon>
                 {{ isFullscreen ? '退出全屏' : '全屏' }}
               </el-button>
+              <el-button
+                v-if="isIntervening || musicPlaying"
+                class="btn-stop-audio"
+                type="warning"
+                size="small"
+                @click="store.stopAudio()"
+              >
+                <el-icon><VideoPause /></el-icon>
+                停止音乐
+              </el-button>
             </div>
           </div>
 
@@ -225,7 +235,7 @@ const router = useRouter()
 const API_BASE = 'http://127.0.0.1:8000'
 
 const store = useSensingStore()
-const { sensing, currentEmotion, recentLogs, feedUrl, feedReady } = storeToRefs(store)
+const { sensing, currentEmotion, isIntervening, musicPlaying, recentLogs, feedUrl, feedReady } = storeToRefs(store)
 
 /* ========= 状态变量 ========= */
 const isGuest = ref(true)
@@ -822,6 +832,11 @@ const toggleFullscreen = () => {
 
 .btn-ctrl:hover {
   background: var(--lavender-gray-200);
+}
+
+.btn-stop-audio {
+  border: none;
+  font-weight: 600;
 }
 
 /* 日记卡片 */

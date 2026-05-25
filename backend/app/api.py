@@ -89,7 +89,8 @@ FACE_DB_REFRESH_INTERVAL = 10       # 缓存刷新间隔 (秒) - 避免每帧都
 state = {
     "last_emotion": "neutral",      # 当前情绪状态
     "mood_score": 0.5,              # 心情指数 (0-1, 0=极负，1=极正)
-    "stress": 0.0                   # 压力水平
+    "stress": 0.0,                  # 压力水平
+    "music_playing": False          # 干预音乐是否正在播放
 }
 
 # 高级情绪分析器实例
@@ -651,9 +652,12 @@ def gen_from_video():
                                 try:
                                     if tts:
                                         asyncio.run(audio_manager.play_comfort_voice(tts))
+                                    state["music_playing"] = True
                                     audio_manager.play_music_for_emotion(_emotion, SessionLocal(), _username)
                                 except Exception as e:
                                     logger.warning(f"干预执行失败: {e}")
+                                finally:
+                                    state["music_playing"] = False
 
                             th.Thread(target=_intervention_worker, args=(tts_text, emotion, username), daemon=True).start()
                             if tts_text:
@@ -949,6 +953,17 @@ async def api_release_camera():
     return {"success": True, "message": "摄像头已释放"}
 
 
+@router.post("/api/audio/stop")
+async def api_stop_audio():
+    """中途停止当前播放的音乐"""
+    global state
+    state["music_playing"] = False
+    if audio_manager:
+        audio_manager.stop()
+        return {"success": True, "message": "音乐已停止"}
+    return {"success": False, "message": "音频管理器未初始化"}
+
+
 @router.get("/video_feed")
 async def video_feed():
     """
@@ -1094,6 +1109,7 @@ async def get_status(db: Session = Depends(get_db)):
         "mood_score": mood,
         "stress_level": stress,
         "should_intervene": should_intervene,
+        "music_playing": state.get("music_playing", False),
         "resource": {
             "text": text_content
         } if should_intervene else None

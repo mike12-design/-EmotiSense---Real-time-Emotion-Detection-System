@@ -9,6 +9,7 @@ export const useSensingStore = defineStore('sensing', () => {
   const sensing = ref(false)
   const currentEmotion = ref('Neutral')
   const isIntervening = ref(false)
+  const musicPlaying = ref(false)
   const recentLogs = ref([])
   const feedKey = ref(0)
   const feedUrl = ref('')
@@ -46,6 +47,7 @@ export const useSensingStore = defineStore('sensing', () => {
       if (res.data.current_emotion) {
         currentEmotion.value = res.data.current_emotion
       }
+      musicPlaying.value = res.data.music_playing || false
       if (res.data.should_intervene) {
         handleIntervention(res.data.resource)
       }
@@ -116,6 +118,12 @@ export const useSensingStore = defineStore('sensing', () => {
     axios.post(`${API_BASE}/api/camera/release`).catch(() => {})
   }
 
+  const stopAudio = () => {
+    musicPlaying.value = false
+    isIntervening.value = false
+    axios.post(`${API_BASE}/api/audio/stop`).catch(() => {})
+  }
+
   const cleanup = () => {
     clearTimeout(pollingTimer)
     pollingTimer = null
@@ -129,6 +137,7 @@ export const useSensingStore = defineStore('sensing', () => {
     cleanup()
     currentEmotion.value = 'Neutral'
     isIntervening.value = false
+    musicPlaying.value = false
     recentLogs.value = []
     feedKey.value = 0
     feedUrl.value = ''
@@ -140,10 +149,10 @@ export const useSensingStore = defineStore('sensing', () => {
   }
 
   return {
-    sensing, currentEmotion, isIntervening, recentLogs,
+    sensing, currentEmotion, isIntervening, musicPlaying, recentLogs,
     feedKey, feedUrl, feedReady, overlayClosed,
     getEmotionColor, getMoodLabel, setAudioPlayer,
     startSensing, stopSensing, fetchStatus, addLogToUI,
-    stopCamera, releaseCamera, cleanup, resetStore
+    stopCamera, releaseCamera, stopAudio, cleanup, resetStore
   }
 })
