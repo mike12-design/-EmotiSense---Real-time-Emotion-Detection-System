@@ -3,16 +3,6 @@
   <div class="login-page">
     <div class="login-bg" aria-hidden="true"></div>
 
-    <header class="login-header" aria-label="branding">
-      <div class="brand-left">
-        <img class="brand-logo" :src="brandLogoUrl" alt="EmotiSense" />
-        <span class="brand-name">EmotiSense</span>
-      </div>
-      <div class="brand-right">
-        <span class="brand-pill">Real-time Emotion Detection</span>
-      </div>
-    </header>
-
     <main class="login-main">
       <section class="login-left" aria-label="intro">
         <div class="left-inner">
@@ -47,8 +37,7 @@
 
       <section class="login-panel" :class="{ 'is-register': !isLogin }" aria-label="login panel">
         <div class="panel-title">
-          <h1 class="panel-h1">{{ isLogin ? 'Sign in' : 'Create account' }}</h1>
-          <p class="panel-sub">{{ isLogin ? '欢迎回来' : '开启情绪之旅' }}</p>
+          <p class="panel-sub">欢迎回来</p>
         </div>
 
         <el-form :model="form" class="panel-form" size="large">
@@ -104,10 +93,6 @@
             </el-link>
           </div>
 
-          <p v-if="isLogin" class="admin-hint">
-            <el-icon class="hint-icon"><InfoFilled /></el-icon>
-            管理员：<code>admin</code>/<code>123456</code>
-          </p>
         </div>
       </section>
     </main>
@@ -117,11 +102,9 @@
 <script setup>
 import { ref } from 'vue';
 import { useRouter } from 'vue-router';
-import { User, Lock, InfoFilled } from '@element-plus/icons-vue';
+import { User, Lock } from '@element-plus/icons-vue';
 import { ElMessage } from 'element-plus';
 import axios from 'axios';
-
-import brandLogoUrl from '../assets/logo.svg';
 
 const router = useRouter();
 const loading = ref(false);
@@ -286,51 +269,10 @@ const handleSubmit = async () => {
   }
 }
 
-.login-header {
-  position: relative;
-  z-index: 2;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 26px 34px;
-}
-
-.brand-left {
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.brand-logo {
-  width: 28px;
-  height: 28px;
-}
-
-.brand-name {
-  font-weight: 700;
-  letter-spacing: 0.6px;
-  font-size: 14px;
-  text-transform: uppercase;
-  color: #1e293b;
-}
-
-.brand-right {
-  display: inline-flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.brand-pill {
-  font-size: 12px;
-  letter-spacing: 0.32em;
-  text-transform: uppercase;
-  color: #64748b;
-}
-
 .login-main {
   position: relative;
   z-index: 2;
-  height: calc(100vh - 82px);
+  height: 100vh;
   display: grid;
   grid-template-columns: minmax(520px, 1.55fr) minmax(360px, 440px);
   align-items: center;
@@ -466,18 +408,11 @@ const handleSubmit = async () => {
   margin-bottom: 18px;
 }
 
-.panel-h1 {
-  margin: 0;
-  font-size: 24px;
-  font-weight: 700;
-  letter-spacing: 0.02em;
-  color: #1e293b;
-}
-
 .panel-sub {
-  margin: 6px 0 0;
-  font-size: 13px;
-  color: #64748b;
+  margin: 0;
+  font-size: 22px;
+  font-weight: 700;
+  color: #1e293b;
 }
 
 .panel-form {
@@ -554,35 +489,7 @@ const handleSubmit = async () => {
   font-weight: 700;
 }
 
-.admin-hint {
-  margin: 14px 0 0;
-  font-size: 12px;
-  color: #94a3b8;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-}
-
-.hint-icon {
-  font-size: 14px;
-  color: #94a3b8;
-}
-
-.admin-hint code {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
-  background: rgba(0, 0, 0, 0.05);
-  padding: 2px 7px;
-  border-radius: 8px;
-  margin: 0 2px;
-  color: #1e293b;
-}
-
 @media (max-width: 720px) {
-  .login-header {
-    padding: 18px 16px;
-  }
-
   .login-main {
     padding: 0 16px 28px;
     grid-template-columns: 1fr;
@@ -591,10 +498,6 @@ const handleSubmit = async () => {
   }
 
   .login-left {
-    display: none;
-  }
-
-  .brand-pill {
     display: none;
   }
 }
