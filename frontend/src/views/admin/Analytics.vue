@@ -9,7 +9,7 @@
   5. AI 系统健康度看板
 -->
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue';
+import { ref, computed, onMounted, onUnmounted } from 'vue';
 import axios from 'axios';
 import { ElMessage, ElEmpty, ElTag } from 'element-plus';
 import {
@@ -103,6 +103,8 @@ let alertRefreshTimer = null;
 const ALERT_REFRESH_INTERVAL = 5000; // 5 秒刷新一次警报
 
 const API_BASE = 'http://127.0.0.1:8000/api';
+
+const nonAdminUsers = computed(() => userList.value.filter(u => u.role !== 'admin'));
 
 // ============ 获取当前登录用户 ============
 const fetchCurrentUser = async () => {
@@ -672,7 +674,7 @@ onUnmounted(() => {
         </div>
       </template>
       <el-menu :default-active="String(selectedUserId)" class="user-menu" @select="handleUserSelect">
-        <el-menu-item v-for="user in userList" :key="user.id" :index="String(user.id)">
+        <el-menu-item v-for="user in nonAdminUsers" :key="user.id" :index="String(user.id)">
           <el-avatar :size="28" :style="{ backgroundColor: user.role === 'admin' ? '#f56c6c' : '#409EFF' }">
             {{ user.username.charAt(0).toUpperCase() }}
           </el-avatar>
