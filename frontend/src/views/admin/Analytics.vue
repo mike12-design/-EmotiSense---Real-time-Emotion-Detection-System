@@ -14,8 +14,8 @@ import axios from 'axios';
 import { ElMessage, ElEmpty, ElTag } from 'element-plus';
 import {
   TrendCharts, DataAnalysis, User, Warning, CircleCheck,
-  Headset, Mic, Notebook, Timer, DataLine,
-  Document, VideoPlay, ChatLineRound, View // 👈 这 4 个是给建议模块用的
+  Headset, Mic, Timer, DataLine,
+  Document, VideoPlay, ChatLineRound, View
 } from '@element-plus/icons-vue';
 
 import * as echarts from 'echarts';
@@ -63,17 +63,6 @@ const trajectoryData = ref({
   std: 1
 });
 
-// 模块 3：干预事件轴
-const interventionEvents = ref([]);
-
-// 模块 4：多模态冲突监控（增加 triggerQuestionnaire 字段）
-const diaryVisualConflict = ref({
-  visualEmotion: 0,
-  diaryEmotion: 0,
-  trustWeight: 0.7,
-  conflictHistory: [],
-  triggerQuestionnaire: false // ✨ 新增：默认不触发
-});
 
 // 模块 5：AI 系统健康度
 const systemHealth = ref({
@@ -84,15 +73,11 @@ const systemHealth = ref({
 
 // DOM 引用
 const trajectoryChartRef = ref(null);
-const eventTimelineChartRef = ref(null);
-const conflictChartRef = ref(null);
 const confidenceChartRef = ref(null);
 const emotionPieChartRef = ref(null);
 
 // 图表实例缓存
 let trajectoryChart = null;
-let eventTimelineChart = null;
-let conflictChart = null;
 let confidenceChart = null;
 let emotionPieChart = null;
 let isUnmounted = false;
@@ -180,52 +165,6 @@ const fetchComprehensiveReport = async () => {
     comprehensiveReport.value = res.data;
   } catch (e) {
     console.error('综合报告加载失败:', e);
-  }
-};
-// ============ 获取干预事件数据 ============
-const fetchInterventionEvents = async () => {
-  if (!selectedUserId.value) return;
-
-  try {
-    const days = timeRange.value === '24h' ? 1 : timeRange.value === '7d' ? 7 : 30;
-    const res = await axios.get(`${API_BASE}/admin/analytics/interventions/${selectedUserId.value}?days=${days}`);
-    interventionEvents.value = res.data.events || [];
-    renderEventTimeline();
-  } catch (e) {
-    console.error('干预事件加载失败:', e);
-  }
-};
-
-// ============ 获取多模态冲突数据 ============
-const fetchConflictData = async () => {
-  if (!selectedUserId.value) return;
-
-  try {
-    const days = timeRange.value === '24h' ? 1 : timeRange.value === '7d' ? 7 : 30;
-    const res = await axios.post(
-      `${API_BASE}/admin/analytics/diary/validate/${selectedUserId.value}`,
-      null,
-      { params: { days } }
-    );
-
-    diaryVisualConflict.value = {
-      visualEmotion: res.data.visual_avg || 0,
-      diaryEmotion: res.data.diary_avg || 0,
-      trustWeight: res.data.trust_weight || 0.7,
-      conflictHistory: res.data.conflict_history || [],
-      // ✨ 新增：接收后端判断的"撒谎/伪装"信号
-      triggerQuestionnaire: res.data.trigger_questionnaire || false
-    };
-
-    renderConflictChart();
-
-    // ✨ 可选：如果检测到撒谎，自动弹出轻提示
-    if (diaryVisualConflict.value.triggerQuestionnaire) {
-      ElMessage.warning(`检测到用户 ${selectedUserId.value} 存在"微笑抑郁"特征（表情与内心严重冲突），建议推送 PHQ-9 量表。`);
-    }
-
-  } catch (e) {
-    console.error('冲突数据加载失败:', e);
   }
 };
 
@@ -358,115 +297,6 @@ const renderTrajectoryChart = () => {
   });
 };
 
-// ============ 模块 3：干预事件轴 ============
-const renderEventTimeline = () => {
-  if (!eventTimelineChartRef.value) return;
-  if (!eventTimelineChart) eventTimelineChart = echarts.init(eventTimelineChartRef.value);
-
-  // 准备数据
-  const events = interventionEvents.value.map((e, i) => ({
-    time: i,
-    type: e.type,
-    effect: e.effect || 0
-  }));
-
-  const musicEvents = events.filter(e => e.type === 'music').map(e => [e.time, 0.5]);
-  const ttsEvents = events.filter(e => e.type === 'tts').map(e => [e.time, 0.8]);
-
-  eventTimelineChart.setOption({
-    title: {
-      text: '干预效果时间轴',
-      left: 'center',
-      textStyle: { fontSize: 16, fontWeight: 'bold' }
-    },
-    tooltip: {
-      formatter: (params) => {
-        if (params.seriesName === '音乐干预') {
-          return `🎵 音乐干预<br/>时间点：${params.data[0]}<br/>效果：${params.data[1] * 100}%`;
-        } else {
-          return `🎤 语音安抚<br/>时间点：${params.data[0]}<br/>效果：${params.data[1] * 100}%`;
-        }
-      }
-    },
-    xAxis: {
-      type: 'category',
-      data: events.map((_, i) => i),
-      name: '时间序列'
-    },
-    yAxis: {
-      type: 'value',
-      name: '干预强度',
-      min: 0,
-      max: 1
-    },
-    series: [
-      {
-        name: '音乐干预',
-        type: 'scatter',
-        data: musicEvents,
-        symbol: 'diamond',
-        symbolSize: 20,
-        itemStyle: { color: '#48dbfb' }
-      },
-      {
-        name: '语音安抚',
-        type: 'scatter',
-        data: ttsEvents,
-        symbol: 'circle',
-        symbolSize: 20,
-        itemStyle: { color: '#feca57' }
-      }
-    ]
-  });
-};
-
-// ============ 模块 4：冲突对比图 ============
-const renderConflictChart = () => {
-  if (!conflictChartRef.value) return;
-  if (!conflictChart) conflictChart = echarts.init(conflictChartRef.value);
-
-  const { visualEmotion, diaryEmotion, trustWeight } = diaryVisualConflict.value;
-
-  conflictChart.setOption({
-    title: {
-      text: '视觉 vs 日记 情绪对比',
-      left: 'center',
-      textStyle: { fontSize: 16, fontWeight: 'bold' }
-    },
-    tooltip: {
-      trigger: 'axis',
-      axisPointer: { type: 'shadow' }
-    },
-    xAxis: {
-      type: 'category',
-      data: ['视觉识别', '日记情感']
-    },
-    yAxis: {
-      type: 'value',
-      name: '效价值',
-      min: -1,
-      max: 1
-    },
-    series: [{
-      type: 'bar',
-      data: [
-        {
-          value: visualEmotion,
-          itemStyle: { color: visualEmotion > 0 ? '#67c23a' : '#f56c6c' }
-        },
-        {
-          value: diaryEmotion,
-          itemStyle: { color: diaryEmotion > 0 ? '#67c23a' : '#f56c6c' }
-        }
-      ],
-      label: {
-        show: true,
-        formatter: '{c}',
-        position: 'top'
-      }
-    }]
-  });
-};
 
 // ============ 模块 5：AI 健康度图表 ============
 const renderConfidenceChart = () => {
@@ -527,39 +357,19 @@ const handleResize = () => {
   if (resizeTimer) clearTimeout(resizeTimer);
   resizeTimer = setTimeout(() => {
     if (trajectoryChart && typeof trajectoryChart.resize === 'function') trajectoryChart.resize();
-    if (eventTimelineChart && typeof eventTimelineChart.resize === 'function') eventTimelineChart.resize();
-    if (conflictChart && typeof conflictChart.resize === 'function') conflictChart.resize();
     if (confidenceChart && typeof confidenceChart.resize === 'function') confidenceChart.resize();
     if (emotionPieChart && typeof emotionPieChart.resize === 'function') emotionPieChart.resize();
   }, 100);
-};
-
-// ✨ 推送 PHQ-9 问卷处理函数
-const handlePushQuestionnaire = () => {
-  ElMessage.success('指令已下发：PHQ-9 问卷已推送至用户端 App。');
-  // 这里可以调用后端接口真正发消息
-  // axios.post(`${API_BASE}/admin/push-phq9/${selectedUserId.value}`)
-};
-
-// ✨ 查看日记详情处理函数
-const handleViewDiaryDetail = () => {
-  // 跳转到日记管理页面或打开对话框
-  ElMessage.info('即将跳转至日记详情页面');
-  // router.push(`/admin/diaries?user=${selectedUserId.value}`)
 };
 
 // 用户选择
 const handleUserSelect = (userId) => {
   // 清理旧图表
   if (trajectoryChart && typeof trajectoryChart.dispose === 'function') trajectoryChart.dispose();
-  if (eventTimelineChart && typeof eventTimelineChart.dispose === 'function') eventTimelineChart.dispose();
-  if (conflictChart && typeof conflictChart.dispose === 'function') conflictChart.dispose();
   if (confidenceChart && typeof confidenceChart.dispose === 'function') confidenceChart.dispose();
   if (emotionPieChart && typeof emotionPieChart.dispose === 'function') emotionPieChart.dispose();
 
   trajectoryChart = null;
-  eventTimelineChart = null;
-  conflictChart = null;
   confidenceChart = null;
   emotionPieChart = null;
 
@@ -570,8 +380,6 @@ const handleUserSelect = (userId) => {
   fetchAlertFeed();
 
   fetchTrajectoryData();
-  fetchInterventionEvents();
-  fetchConflictData();
   fetchSystemHealth();
 };
 
@@ -580,8 +388,6 @@ const handleTimeRangeChange = () => {
   fetchAlertFeed();
 
   fetchTrajectoryData();
-  fetchInterventionEvents();
-  fetchConflictData();
   fetchSystemHealth();
 };
 
@@ -656,8 +462,6 @@ onUnmounted(() => {
 
   // 清理所有图表实例
   if (trajectoryChart && typeof trajectoryChart.dispose === 'function') trajectoryChart.dispose();
-  if (eventTimelineChart && typeof eventTimelineChart.dispose === 'function') eventTimelineChart.dispose();
-  if (conflictChart && typeof conflictChart.dispose === 'function') conflictChart.dispose();
   if (confidenceChart && typeof confidenceChart.dispose === 'function') confidenceChart.dispose();
   if (emotionPieChart && typeof emotionPieChart.dispose === 'function') emotionPieChart.dispose();
 });
@@ -853,85 +657,6 @@ onUnmounted(() => {
           </el-card>
         </el-col>
       </el-row>
-
-      <!-- 模块 3：干预效果事件轴 -->
-      <el-row :gutter="16" class="module-row">
-        <el-col :span="24">
-          <el-card class="module-card" shadow="hover" v-if="interventionEvents.length > 0">
-            <template #header>
-              <div class="card-header">
-                <el-icon><Headset /></el-icon>
-                <span>干预效果时间轴</span>
-              </div>
-            </template>
-            <div ref="eventTimelineChartRef" class="timeline-chart"></div>
-          </el-card>
-        </el-col>
-      </el-row>
-
-  <!-- 模块 4：多模态冲突监控 -->
-      <el-row :gutter="16" class="module-row">
-        <el-col :span="24">
-          <el-card class="module-card" shadow="hover">
-            <template #header>
-              <div class="card-header">
-                <el-icon><Notebook /></el-icon>
-                <span>日记 - 视觉冲突监控</span>
-              </div>
-            </template>
-            <div ref="conflictChartRef" class="conflict-chart"></div>
-            
-            <div class="conflict-analysis">
-              <!-- 原有：信任度进度条 -->
-              <div class="analysis-item">
-                <span class="label">AI 视觉信任权重:</span>
-                <el-progress
-                  :percentage="Math.round(diaryVisualConflict.trustWeight * 100)"
-                  :color="diaryVisualConflict.trustWeight > 0.7 ? '#67c23a' : '#e6a23c'"
-                  style="width: 200px"
-                ></el-progress>
-              </div>
-
-              <!-- ✨ 新增：微笑抑郁/撒谎检测 专用警告块 -->
-              <template v-if="diaryVisualConflict.triggerQuestionnaire">
-                <transition name="el-zoom-in-top" appear>
-                  <div class="masking-alert">
-                    <el-alert
-                      title="⚠️ 触发【微笑抑郁】预警机制"
-                      type="error"
-                      description="检测到'表情积极'但'日记消极'的严重倒置（Masking Behavior）。系统判定视觉数据失效，建议立即介入。"
-                      :closable="false"
-                      show-icon
-                      effect="dark"
-                    ></el-alert>
-                    <div class="action-row">
-                      <el-button type="danger" size="small" plain @click="handlePushQuestionnaire">
-                        立即推送 PHQ-9 抑郁筛查量表
-                      </el-button>
-                      <el-button type="info" size="small" plain @click="handleViewDiaryDetail">
-                        查看日记详情
-                      </el-button>
-                    </div>
-                  </div>
-                </transition>
-              </template>
-
-              <!-- 原有：普通冲突提示（保留作为轻度提示） -->
-              <template v-else-if="Math.abs(diaryVisualConflict.visualEmotion - diaryVisualConflict.diaryEmotion) > 0.5">
-                <div class="analysis-item">
-                  <el-alert
-                    title="注意：视觉表情与文字情感存在偏差"
-                    type="warning"
-                    :closable="false"
-                    show-icon
-                  ></el-alert>
-                </div>
-              </template>
-              
-            </div> <!-- 这里是 conflict-analysis 的闭合 -->
-          </el-card> <!-- 这里是 el-card 的闭合 -->
-        </el-col> <!-- 这里是 el-col 的闭合 -->
-      </el-row> <!-- 这里是 el-row 的闭合 -->
 
       <!-- 模块 5：AI 系统健康度 -->
       <el-row :gutter="16" class="module-row">
@@ -1317,38 +1042,6 @@ onUnmounted(() => {
 
 .dot.band {
   background: rgba(230, 162, 60, 0.3);
-}
-
-/* 时间轴图表 */
-.timeline-chart {
-  height: 200px;
-  width: 100%;
-}
-
-/* 冲突图表 */
-.conflict-chart {
-  height: 250px;
-  width: 100%;
-}
-
-.conflict-analysis {
-  margin-top: 16px;
-}
-
-/* ✨ 微笑抑郁预警专用样式 */
-.masking-alert {
-  margin-top: 16px;
-  border: 1px solid #fde2e2;
-  padding: 10px;
-  border-radius: 4px;
-  background: #fef0f0;
-}
-
-.action-row {
-  margin-top: 10px;
-  display: flex;
-  gap: 10px;
-  justify-content: flex-end;
 }
 
 /* AI 健康度 */

@@ -58,7 +58,7 @@ from core.detector import FaceDetector, create_emotion_detector, find_identity
 from core.stabilizer import EmotionStabilizer
 from core.audio_manager import AudioManager
 from core.emotion_dynamics import EmotionDynamicsEngine
-from core.advanced_analyzer import AdvancedEmotionAnalyzer, DiarySentimentAnalyzer
+from core.advanced_analyzer import AdvancedEmotionAnalyzer
 
 
 # ============================================================================
@@ -94,7 +94,6 @@ state = {
 
 # 高级情绪分析器实例
 advanced_analyzer = AdvancedEmotionAnalyzer()   # 吸引子模型、RMSSD 分析
-diary_analyzer = DiarySentimentAnalyzer()       # 日记情感分析
 
 # ===== 情绪日志节流控制 (Emotion Logging Gate) =====
 # 功能：防止数据库写入过频，只有情绪持续 EMOTION_CHANGE_MIN_DURATION 秒以上才写入
@@ -990,7 +989,7 @@ async def get_my_history_stats(username: str, range_type: str = 'day', db: Sessi
 
     elif range_type == 'week':
         # 查询本周数据
-        start_of_week = now - timedelta(days=now.weekday())
+        start_of_week = (now - timedelta(days=now.weekday())).replace(hour=0, minute=0, second=0, microsecond=0)
         logs = logs_query.filter(EmotionLog.timestamp >= start_of_week).all()
         # 横坐标显示日期 (2024-02-19)
         label_func = lambda t: t.strftime('%Y-%m-%d')
@@ -1666,78 +1665,6 @@ async def get_advanced_analytics(
     }
 
 
-@router.post("/api/admin/analytics/diary/validate/{user_id}")
-async def validate_diary_emotion(
-    user_id: int,
-    days: int = 7,
-    month: Optional[str] = None,
-    db: Session = Depends(get_db)
-):
-    """
-    日记情感闭环校验
-
-    对比视觉识别情绪与日记主观情感的一致性，
-    用于验证视觉模型的准确性并提供自校正建议。
-    """
-    # 获取用户
-    user = db.query(User).filter(User.id == user_id).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="用户不存在")
-
-    # 获取日记数据
-    cutoff, end_time = resolve_time_window(days=days, month=month)
-    diaries = db.query(Diary).filter(
-        Diary.user_id == user_id,
-        Diary.timestamp >= cutoff,
-        Diary.timestamp <= end_time
-    ).all()
-
-    # 获取同期视觉识别数据
-    vision_logs = db.query(EmotionLog).filter(
-        EmotionLog.user_id == user_id,
-        EmotionLog.timestamp >= cutoff,
-        EmotionLog.timestamp <= end_time
-    ).order_by(EmotionLog.timestamp).all()
-
-    if not diaries or not vision_logs:
-        return {
-            "consistency": "insufficient_data",
-            "message": "日记或视觉数据不足",
-            "diary_count": len(diaries) if diaries else 0,
-            "vision_count": len(vision_logs) if vision_logs else 0
-        }
-
-    # 转换为分析器格式
-    diary_entries = [
-        {"timestamp": d.timestamp.timestamp(), "content": d.content}
-        for d in diaries
-    ]
-    vision_entries = [
-        {"timestamp": v.timestamp.timestamp(), "emotion": v.emotion, "score": v.score}
-        for v in vision_logs
-    ]
-
-    # 执行校验
-    result = diary_analyzer.validate_visual_emotion(diary_entries, vision_entries)
-
-    # 优化 3：检测极端不对称性（如视觉极度悲伤 V < -0.5，但日记强颜欢笑 V > 0.2）
-    visual_score = result.get("visual_avg", 0)
-    diary_score = result.get("diary_avg", 0)
-
-    is_lying = (visual_score < -0.5) and (diary_score > 0.2)
-    severe_conflict = abs(visual_score - diary_score) > 0.7
-
-    # 向前端下发指令，触发第三方量表仲裁（如弹窗 PHQ-9 简易问卷）
-    trigger_questionnaire = is_lying or severe_conflict
-
-    return {
-        "user_id": user_id,
-        "analysis_period_days": days,
-        "diary_entries": len(diaries),
-        "vision_logs": len(vision_logs),
-        "trigger_questionnaire": trigger_questionnaire,  # 新增字段：指示前端弹窗
-        **result
-    }
 
 
 @router.get("/api/admin/analytics/intervention/suggest/{user_id}")
@@ -2012,42 +1939,6 @@ async def get_quadrant_data(db: Session = Depends(get_db)):
 
     return {"users": users_data}
 
-
-@router.get("/api/admin/analytics/interventions/{user_id}")
-async def get_intervention_events(
-    user_id: int,
-    days: int = 7,
-    month: Optional[str] = None,
-    db: Session = Depends(get_db)
-):
-    """
-    获取干预事件时间轴数据
-    """
-    cutoff, end_time = resolve_time_window(days=days, month=month)
-
-    # 获取系统事件中的干预记录
-    events = db.query(SystemEvent).filter(
-        SystemEvent.timestamp >= cutoff,
-        SystemEvent.timestamp <= end_time
-    ).order_by(SystemEvent.timestamp).all()
-
-    intervention_events = []
-    for event in events:
-        event_type = event.action_type.lower()
-        if "music" in event_type:
-            intervention_events.append({
-                "timestamp": event.timestamp.isoformat(),
-                "type": "music",
-                "effect": 0.7  # 模拟效果值
-            })
-        elif "tts" in event_type or "voice" in event_type:
-            intervention_events.append({
-                "timestamp": event.timestamp.isoformat(),
-                "type": "tts",
-                "effect": 0.8
-            })
-
-    return {"events": intervention_events}
 
 
 @router.get("/api/admin/analytics/system-health")
