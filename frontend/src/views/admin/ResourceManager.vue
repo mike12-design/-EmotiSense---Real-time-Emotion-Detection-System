@@ -53,44 +53,7 @@
 
           <el-tabs v-model="activeTab" class="resource-tabs">
             
-            <!-- Tab 1: 个性化背景 (全局没有背景) -->
-            <el-tab-pane label="🖼️ 背景图片" name="background" :disabled="currentUser.isGlobal">
-              <!-- 省略背景配置代码，保持原样 -->
-              <div v-if="currentUser.isGlobal" class="empty-state">
-                <el-empty description="全局配置不支持设置背景图片，请在左侧选择具体用户" />
-              </div>
-              <el-row :gutter="20" v-else>
-                <el-col :span="12">
-                  <div class="bg-preview-card">
-                    <p class="section-title">当前背景</p>
-                    <div class="image-box">
-                      <img :src="currentUserBgUrl" @error="handleImgError" v-if="!bgLoadError" key="bg-image"/>
-                      <div v-else class="no-bg">
-                        <el-icon :size="40" color="#ddd"><Picture /></el-icon>
-                        <p>该用户使用的是系统默认背景</p>
-                      </div>
-                    </div>
-                  </div>
-                </el-col>
-                <el-col :span="12">
-                  <div class="bg-action-card">
-                    <p class="section-title">管理操作</p>
-                    <el-alert title="强制为该用户更改专属背景" type="warning" :closable="false" class="mb-4" />
-                    <el-upload
-                      class="upload-demo"
-                      action="#"
-                      :http-request="handleBgUpload"
-                      :show-file-list="false"
-                      accept=".jpg,.jpeg,.png"
-                    >
-                      <el-button type="primary" icon="Upload">上传/覆盖背景</el-button>
-                    </el-upload>
-                  </div>
-                </el-col>
-              </el-row>
-            </el-tab-pane>
-
-            <!-- Tab 2: 话术库 -->
+            <!-- 话术库 -->
             <el-tab-pane :label="`💬 安慰话术库 ${currentUser.isGlobal ? '(全局)' : '(专属)'}`" name="scripts">
               <div class="flex-header mb-4">
                 <el-alert 
@@ -116,7 +79,7 @@
               </el-table>
             </el-tab-pane>
 
-            <!-- 💡 核心修改点：Tab 3 音乐干预列表重构 -->
+            <!-- 音乐干预列表 -->
             <el-tab-pane :label="`🎵 音乐库 ${currentUser.isGlobal ? '(全局)' : '(专属)'}`" name="music">
               <div class="flex-header mb-4">
                 <el-alert 
@@ -235,16 +198,14 @@
 import { ref, onMounted, computed } from 'vue'
 import axios from 'axios'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Menu, Setting, Picture, Upload, Plus, Delete, Headset, VideoPlay, VideoPause } from '@element-plus/icons-vue'
+import { Menu, Setting, Upload, Plus, Delete, Headset, VideoPlay, VideoPause } from '@element-plus/icons-vue'
 
 const API_BASE = "http://127.0.0.1:8000"
 
 const userList = ref([])
 const currentUser = ref(null)
 const activeUserIndex = ref("0")
-const activeTab = ref('scripts') 
-const bgLoadError = ref(false)
-const timeStamp = ref(Date.now())
+const activeTab = ref('scripts')
 
 const scripts = ref([])
 const scriptDialogVisible = ref(false)
@@ -280,11 +241,13 @@ const fetchUsers = async () => {
       isGlobal: true 
     }
 
-    const normalUsers = res.data.users.map(u => ({
-      ...u,
-      displayName: u.username,
-      isGlobal: false
-    }))
+    const normalUsers = res.data.users
+      .filter(u => u.role !== 'admin')
+      .map(u => ({
+        ...u,
+        displayName: u.username,
+        isGlobal: false
+      }))
     userList.value = [globalConfig, ...normalUsers]
 
 
@@ -299,15 +262,8 @@ const fetchUsers = async () => {
 
 const handleUserSelect = (user) => {
   currentUser.value = user
-  bgLoadError.value = false
-  timeStamp.value = Date.now()
-  
-  if (user.isGlobal && activeTab.value === 'background') {
-    activeTab.value = 'scripts'
-  }
-  
   fetchScripts()
-  fetchMusic() 
+  fetchMusic()
 }
 
 // 获取话术
@@ -427,22 +383,6 @@ const handlePlayMusic = (row) => {
   playingMusicId.value = row.id
 }
 
-// 背景相关代码
-const currentUserBgUrl = computed(() => `${API_BASE}/assets/bg_${currentUser.value?.username}.jpg?t=${timeStamp.value}`)
-const handleImgError = () => bgLoadError.value = true
-
-const handleBgUpload = async (options) => {
-  const formData = new FormData()
-  formData.append('file', options.file)
-  formData.append('username', currentUser.value.username)
-  try {
-    await axios.post(`${API_BASE}/api/user/upload_background`, formData)
-    ElMessage.success(`已更新用户的背景`)
-    bgLoadError.value = false
-    timeStamp.value = Date.now()
-  } catch (e) { ElMessage.error('上传失败') }
-}
-
 const stringToColor = (str) => {
   let hash = 0
   for (let i = 0; i < str.length; i++) hash = str.charCodeAt(i) + ((hash << 5) - hash)
@@ -466,17 +406,11 @@ onMounted(() => fetchUsers())
 
 .panel-header { border-bottom: 1px solid #eee; padding-bottom: 15px; margin-bottom: 20px; }
 .panel-header h2 { margin: 0 0 5px 0; font-size: 20px; }
-.bg-preview-card, .bg-action-card { border: 1px solid #ebeef5; border-radius: 8px; padding: 20px; height: 300px; }
-.section-title { font-weight: bold; margin-bottom: 15px; color: #606266; }
-.image-box { width: 100%; height: 200px; background: #f5f7fa; border-radius: 6px; overflow: hidden; display: flex; align-items: center; justify-content: center; border: 2px dashed #e4e7ed; }
-.image-box img { width: 100%; height: 100%; object-fit: cover; }
-.no-bg { text-align: center; color: #909399; }
-.mb-4 { margin-bottom: 16px; }
 
 /* 新增 header 通用 Flex 布局 */
 .flex-header { display: flex; justify-content: space-between; align-items: center; }
+.mb-4 { margin-bottom: 16px; }
 
-.empty-state { display: flex; align-items: center; justify-content: center; height: 100%; flex-direction: column; padding: 50px 0;}
 .el-aside::-webkit-scrollbar { width: 4px; }
 .el-aside::-webkit-scrollbar-thumb { background: #e0e3e9; border-radius: 2px; }
 </style>
