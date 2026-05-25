@@ -38,11 +38,13 @@
 <script setup>
 import { ref } from 'vue';
 import { useRouter } from 'vue-router';
+import { useSensingStore } from '../stores/sensing';
 
-const router = useRouter(); // 确保这里已经定义了 router
+const router = useRouter();
 const username = ref(localStorage.getItem('user') || 'User');
 
 const handleLogout = () => {
+  useSensingStore().resetStore()
   localStorage.clear();
   router.push('/login');
 };

@@ -308,6 +308,7 @@ const goToWriteDiary = () => {
 }
 
 const handleLogout = () => {
+  store.resetStore()
   localStorage.clear()
   isGuest.value = true
   username.value = ''

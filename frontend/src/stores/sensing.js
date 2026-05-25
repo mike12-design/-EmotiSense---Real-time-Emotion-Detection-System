@@ -117,7 +117,26 @@ export const useSensingStore = defineStore('sensing', () => {
   }
 
   const cleanup = () => {
-    stopSensing()
+    clearTimeout(pollingTimer)
+    pollingTimer = null
+    sensing.value = false
+    feedReady.value = false
+    axios.post(`${API_BASE}/api/camera/stop`).catch(() => {})
+    axios.post(`${API_BASE}/api/camera/release`).catch(() => {})
+  }
+
+  const resetStore = () => {
+    cleanup()
+    currentEmotion.value = 'Neutral'
+    isIntervening.value = false
+    recentLogs.value = []
+    feedKey.value = 0
+    feedUrl.value = ''
+    overlayClosed.value = false
+    if (audioPlayer) {
+      audioPlayer.pause()
+      audioPlayer.src = ''
+    }
   }
 
   return {
@@ -125,6 +144,6 @@ export const useSensingStore = defineStore('sensing', () => {
     feedKey, feedUrl, feedReady, overlayClosed,
     getEmotionColor, getMoodLabel, setAudioPlayer,
     startSensing, stopSensing, fetchStatus, addLogToUI,
-    stopCamera, releaseCamera, cleanup
+    stopCamera, releaseCamera, cleanup, resetStore
   }
 })

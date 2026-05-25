@@ -86,6 +86,7 @@
 <script setup>
 import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { useSensingStore } from '../stores/sensing'
 import {
   Odometer, User, DataAnalysis, Files, Document,
   Monitor, SwitchButton, UserFilled, House
@@ -106,6 +107,7 @@ const currentPathName = computed(() => {
 })
 
 const handleLogout = () => {
+  useSensingStore().resetStore()
   localStorage.clear()
   router.push('/login')
 }
