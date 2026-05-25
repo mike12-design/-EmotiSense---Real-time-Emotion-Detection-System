@@ -1762,6 +1762,8 @@ async def get_alert_feed(
     limit: int = 20,
     days: Optional[int] = None,
     month: Optional[str] = None,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
     user_id: Optional[int] = None,
     db: Session = Depends(get_db),
 ):
@@ -1772,7 +1774,14 @@ async def get_alert_feed(
     个人视图（有 user_id）：该用户的风险评估 + 该用户被监测期间的系统事件。
         用户无情绪数据 → 返回空（系统事件不属于该用户）。
     """
-    start_time, end_time = resolve_time_window(days=days, month=month)
+    if start_date and end_date:
+        try:
+            start_time = datetime.strptime(start_date, "%Y-%m-%d")
+            end_time = datetime.strptime(end_date, "%Y-%m-%d").replace(hour=23, minute=59, second=59)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="日期格式应为 YYYY-MM-DD")
+    else:
+        start_time, end_time = resolve_time_window(days=days, month=month)
     now = datetime.now()
 
     alerts = []

@@ -55,7 +55,7 @@ const comprehensiveReport = ref(null);
 // 模块 1：高危预警台数据
 const alertFeed = ref([]);
 const alertLimit = ref(3);
-const alertDays = ref('7');
+const alertDateRange = ref([]);
 const alertTotal = ref(0);
 
 // 模块 2：情绪轨迹图
@@ -124,12 +124,16 @@ const fetchUserList = async () => {
 // ============ 获取高危预警数据 ============
 const fetchAlertFeed = async () => {
   try {
-    const res = await axios.get(`${API_BASE}/admin/analytics/alerts`, {
-      params: {
-        limit: alertLimit.value,
-        days: alertDays.value
-      }
-    });
+    const params = { limit: alertLimit.value };
+    if (alertDateRange.value?.length === 2) {
+      const fmt = d => {
+        const p = n => String(n).padStart(2, '0');
+        return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+      };
+      params.start_date = fmt(alertDateRange.value[0]);
+      params.end_date = fmt(alertDateRange.value[1]);
+    }
+    const res = await axios.get(`${API_BASE}/admin/analytics/alerts`, { params });
     alertFeed.value = res.data.alerts || [];
     alertTotal.value = res.data.total || alertFeed.value.length;
   } catch (e) {
@@ -421,6 +425,12 @@ const getAlertIcon = (level) => {
 
 // 生命周期
 onMounted(async () => {
+  // 默认近7天
+  const end = new Date();
+  const start = new Date();
+  start.setDate(start.getDate() - 7);
+  alertDateRange.value = [start, end];
+
   await fetchCurrentUser();
   fetchUserList();
   fetchAlertFeed();
@@ -569,11 +579,16 @@ onUnmounted(() => {
             <!-- 时间筛选栏 -->
             <div class="alert-filter-bar">
               <span class="filter-label">时间范围：</span>
-              <el-radio-group v-model="alertDays" size="small" @change="onAlertFilterChange">
-                <el-radio-button value="1">今天</el-radio-button>
-                <el-radio-button value="7">近7天</el-radio-button>
-                <el-radio-button value="30">近30天</el-radio-button>
-              </el-radio-group>
+              <el-date-picker
+                v-model="alertDateRange"
+                type="daterange"
+                range-separator="至"
+                start-placeholder="开始日期"
+                end-placeholder="结束日期"
+                size="small"
+                style="width: 280px"
+                @change="onAlertFilterChange"
+              />
               <span class="filter-hint">显示最近 {{ alertLimit }} 条</span>
             </div>
 
