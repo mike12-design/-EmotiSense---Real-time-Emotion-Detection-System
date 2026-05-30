@@ -56,6 +56,14 @@ class AdvancedEmotionAnalyzer:
     """
 
     # 情绪效价映射表 (基于心理学研究)
+    # 图表用效价映射：直接按情绪标签定值，不受动力学引擎平滑影响
+    CHART_VALENCE = {
+        "happy": 0.8, "surprise": 0.4,
+        "neutral": 0.0, "sad": -0.5,
+        "fear": -0.6, "angry": -0.8,
+        "disgust": -0.7, "contempt": -0.5
+    }
+
     VALENCE_MAP = {
         "happy": 1.0,
         "surprise": 0.3,
@@ -117,17 +125,8 @@ class AdvancedEmotionAnalyzer:
             score = log.get('score', 50.0)
             timestamp = log.get('timestamp', 0)
 
-            # 1. 获取基础效价
-            valence = self.valence_map(emotion)
-
-            # 2. 计算最终情绪值
-            #    neutral 的效价为 0，会导致所有 neutral 点挤在 0 上
-            #    改用 (score - 0.5) * 2 让心情指数可反映情绪偏向
-            normalized_score = score
-            if emotion.lower() == "neutral":
-                v_final = (normalized_score - 0.5) * 2  # 0.5→0, 0.3→-0.4, 0.7→+0.4
-            else:
-                v_final = valence * normalized_score
+            # 图表效价：直接用情绪标签映射，不依赖被动力学引擎平滑后的 score
+            v_final = self.CHART_VALENCE.get(emotion.lower(), 0.0)
 
             timestamps.append(timestamp)
             v_final_values.append(v_final)
