@@ -63,28 +63,18 @@
       </div>
     </template>
 
-    <!-- 上传 -->
-    <el-form :inline="true" size="small">
-      <el-form-item label="情绪">
-        <el-select v-model="musicEmotion" style="width: 120px" clearable placeholder="全部">
-          <el-option label="😊 开心" value="happy" />
-          <el-option label="😢 难过" value="sad" />
-          <el-option label="😡 愤怒" value="angry" />
-          <el-option label="😐 平静" value="neutral" />
-        </el-select>
-      </el-form-item>
-
-      <el-form-item>
-        <el-upload
-          action="#"
-          :http-request="handleMusicUpload"
-          :show-file-list="false"
-          accept=".mp3"
-        >
-          <el-button type="primary">上传音乐</el-button>
-        </el-upload>
-      </el-form-item>
-    </el-form>
+    <!-- 上传按钮 + 筛选 -->
+    <div class="music-toolbar">
+      <el-button type="primary" size="small" @click="openMusicDialog" icon="Upload">
+        上传音乐
+      </el-button>
+      <el-select v-model="musicEmotion" style="width: 120px" clearable placeholder="筛选情绪" size="small">
+        <el-option label="😊 开心" value="happy" />
+        <el-option label="😢 难过" value="sad" />
+        <el-option label="😡 愤怒" value="angry" />
+        <el-option label="😐 平静" value="neutral" />
+      </el-select>
+    </div>
 
     <!-- 列表 -->
     <el-table :data="filteredMusicList" height="300" stripe border size="small">
@@ -117,6 +107,44 @@
       </el-table-column>
     </el-table>
     <audio ref="audioRef" @ended="playingMusicId = null" style="display:none" />
+
+    <!-- 上传音乐弹窗 -->
+    <el-dialog v-model="musicDialogVisible" title="上传音乐" width="450px" center destroy-on-close>
+      <el-form :model="musicForm" label-position="top">
+        <el-form-item label="触发情绪场景">
+          <el-radio-group v-model="musicForm.emotion_tag" size="large">
+            <el-radio-button value="sad">悲伤</el-radio-button>
+            <el-radio-button value="angry">愤怒</el-radio-button>
+            <el-radio-button value="happy">开心</el-radio-button>
+            <el-radio-button value="neutral">平静</el-radio-button>
+          </el-radio-group>
+        </el-form-item>
+        <el-form-item label="选择MP3文件">
+          <el-upload
+            ref="musicUploadRef"
+            action="#"
+            :auto-upload="false"
+            :limit="1"
+            accept=".mp3"
+            :on-change="handleMusicFileChange"
+            :on-remove="() => musicForm.file = null"
+          >
+            <template #trigger>
+              <el-button type="primary">选择文件</el-button>
+            </template>
+            <template #tip>
+              <div class="el-upload__tip">只能上传 MP3 格式文件</div>
+            </template>
+          </el-upload>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="musicDialogVisible = false">取消</el-button>
+        <el-button type="success" @click="submitMusicUpload" :disabled="!musicForm.file">
+          确认上传
+        </el-button>
+      </template>
+    </el-dialog>
   </el-card>
 </el-col>
 
@@ -236,6 +264,9 @@ const videoUrl = ref('');
 
 // ===== 音乐模块变量 =====
 const musicEmotion = ref('');
+const musicDialogVisible = ref(false);
+const musicForm = ref({ emotion_tag: 'happy', file: null });
+const musicUploadRef = ref(null);
 const audioRef = ref(null);
 const playingMusicId = ref(null);
 
@@ -325,25 +356,32 @@ const confirmCapture = async () => {
 };
 
 // ==========================================
-// 2. 音乐上传逻辑 (新增)
+// 2. 音乐上传逻辑（弹窗式）
 // ==========================================
-const handleMusicUpload = async (options) => {
-  if (!musicEmotion.value) {
-    await ElMessageBox.confirm(
-      '请先在上方下拉框中选择情绪标签（开心/难过/愤怒/平静），然后再次点击上传',
-      '需要选择情绪',
-      { confirmButtonText: '知道了', showCancelButton: false, type: 'warning' }
-    )
-    return
+const openMusicDialog = () => {
+  musicForm.value = { emotion_tag: 'happy', file: null }
+  if (musicUploadRef.value) {
+    musicUploadRef.value.clearFiles()
   }
+  musicDialogVisible.value = true
+}
+
+const handleMusicFileChange = (file) => {
+  musicForm.value.file = file.raw
+}
+
+const submitMusicUpload = async () => {
+  if (!musicForm.value.file) return ElMessage.warning("请选择MP3文件")
+
   const formData = new FormData()
-  formData.append("file", options.file)
-  formData.append("emotion", musicEmotion.value)
-  formData.append("username", username)
+  formData.append('file', musicForm.value.file)
+  formData.append('emotion', musicForm.value.emotion_tag)
+  formData.append('username', username)
 
   try {
     await axios.post(`${API_BASE}/api/user/upload_music`, formData)
     ElMessage.success("上传成功")
+    musicDialogVisible.value = false
     fetchUserMusic()
   } catch (e) {
     const msg = e.response?.data?.detail || e.message || "未知错误"
@@ -453,6 +491,7 @@ onMounted(() => {
 <style scoped>
 
 .settings-container { padding: 20px; }
+.music-toolbar { display: flex; gap: 10px; align-items: center; margin-bottom: 12px; }
 .settings-container .el-col {
   display: flex;
 }
