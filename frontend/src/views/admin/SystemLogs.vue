@@ -184,7 +184,7 @@ const fetchUserList = async () => {
   try {
     const res = await axios.get(`${API_BASE}/api/admin/users`)
     const users = res.data.users || []
-    userList.value = users
+    userList.value = users.filter(u => u.role !== 'admin')
     if (users.length && !selectedUser.value) {
       selectedUser.value = users[0].username
     }
