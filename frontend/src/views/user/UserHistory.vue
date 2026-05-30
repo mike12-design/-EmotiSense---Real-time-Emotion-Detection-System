@@ -71,7 +71,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue';
+import { ref, onMounted, onUnmounted, nextTick } from 'vue';
 import axios from 'axios';
 import * as echarts from 'echarts';
 import { TrendCharts } from '@element-plus/icons-vue';
@@ -182,6 +182,8 @@ const fetchChartData = async () => {
       chartEmpty.value = true;
       if (myChart) { myChart.dispose(); myChart = null; }
     } else {
+      chartEmpty.value = false;
+      await nextTick();
       initChart(res.data);
     }
   } catch (e) {
