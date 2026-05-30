@@ -36,7 +36,10 @@ class AudioManager:
         return False
 
     def play_music_for_emotion(self, emotion: str, db: Session, username: str = None):
-        if self._is_playing():
+        # 情绪变了且正在播放 → 停止旧歌，切新歌
+        if emotion != self.current_emotion and self._is_playing():
+            self.stop()
+        elif self._is_playing():
             return
 
         music_record = self._get_random_music(emotion, db, username)
