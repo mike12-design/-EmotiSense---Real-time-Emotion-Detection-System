@@ -17,7 +17,6 @@ import logging
 import random
 import time
 import shutil
-import queue
 import threading
 from pathlib import Path
 from collections import Counter, defaultdict
@@ -235,37 +234,50 @@ class VideoCapture:
         self.cap = cv2.VideoCapture(index)
         self._released = False
         self._read_lock = threading.Lock()
+        self._latest_frame = None
+        self._latest_frame_ts = 0.0
+        self._capture_stop = threading.Event()
+        self._capture_thread = None
         if not self.cap or not self.cap.isOpened():
             raise RuntimeError("无法打开摄像头")
+        self._start_capture_worker()
+
+    def _start_capture_worker(self):
+        """后台持续读取最新帧，避免每次 read_raw 都创建新线程导致卡顿。"""
+        def _worker():
+            err_count = 0
+            while not self._capture_stop.is_set():
+                if self.cap is None:
+                    break
+                try:
+                    with self._read_lock:
+                        ret, frame = self.cap.read()
+                    if ret and frame is not None:
+                        self._latest_frame = frame
+                        self._latest_frame_ts = time.time()
+                        err_count = 0
+                    else:
+                        time.sleep(0.005)
+                except Exception:
+                    err_count += 1
+                    if err_count == 1 or err_count % 100 == 0:
+                        logger.warning(f"📷 [摄像头] 采集线程连续 {err_count} 次读取失败")
+                    time.sleep(0.01)
+
+        self._capture_thread = threading.Thread(target=_worker, daemon=True)
+        self._capture_thread.start()
 
     def read_raw(self, timeout: float = 3.0) -> Optional[np.ndarray]:
-        """返回原始 BGR numpy frame，带超时保护防止 macOS OpenCV 阻塞。"""
+        """返回最近一帧（BGR），超时时返回 None。"""
         if self.cap is None or self._released:
             return None
-        result: queue.Queue = queue.Queue(maxsize=1)
-
-        def _read():
-            try:
-                with self._read_lock:
-                    result.put(self.cap.read())
-            except Exception as e:
-                result.put(e)
-
-        t = threading.Thread(target=_read, daemon=True)
-        t.start()
-        t.join(timeout=timeout)
-        if t.is_alive():
-            return None
-        try:
-            res = result.get_nowait()
-        except queue.Empty:
-            return None
-        if isinstance(res, Exception):
-            return None
-        ret, frame = res
-        if not ret or frame is None:
-            return None
-        return frame
+        deadline = time.time() + timeout
+        while time.time() < deadline and not self._released:
+            frame = self._latest_frame
+            if frame is not None:
+                return frame.copy()
+            time.sleep(0.002)
+        return None
 
     def get_frame(self) -> Optional[bytes]:
         """返回编码好的 jpeg bytes（用于简单的直接流回退场景）。"""
@@ -280,6 +292,9 @@ class VideoCapture:
     def release(self):
         """释放摄像头资源"""
         self._released = True
+        self._capture_stop.set()
+        if self._capture_thread and self._capture_thread.is_alive():
+            self._capture_thread.join(timeout=0.5)
         if self.cap:
             try:
                 self.cap.release()

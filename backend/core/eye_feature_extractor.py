@@ -12,6 +12,8 @@
     eye_sad_prob = extractor.predict_eye_emotion(eye_img)
 """
 
+import os
+import time
 import cv2
 import numpy as np
 import torch
@@ -55,6 +57,11 @@ class EyeFeatureExtractor:
         self.eye_cascade = cv2.CascadeClassifier(
             cv2.data.haarcascades + 'haarcascade_eye.xml'
         )
+
+        # 调试落盘默认关闭，避免实时推理时高频 I/O 导致卡顿
+        self.debug_save_failed_eyes = os.getenv("EMOTISENSE_DEBUG_SAVE_FAILED_EYES", "0") == "1"
+        self.debug_save_interval_sec = float(os.getenv("EMOTISENSE_DEBUG_SAVE_INTERVAL_SEC", "2.0"))
+        self._last_debug_save_ts = 0.0
         
         self._load_model()
     
@@ -192,10 +199,6 @@ class EyeFeatureExtractor:
         """
         从帧中提取眼睛区域 - 包含调试存图与硬裁剪兜底
         """
-        import os
-        import time
-        from pathlib import Path
-        
         gray = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2GRAY)
         
         # 🎯 尝试方法 1：有人脸框时，在人脸上半部分检测
@@ -239,20 +242,25 @@ class EyeFeatureExtractor:
      
         logger.debug("⚠️ 眼睛被遮挡（墨镜/低头），局部专家失效，拒绝瞎猜")
         
-        try:
-            # 你之前的存图逻辑可以保留在这里，方便你以后继续看
-            import os, time
-            from pathlib import Path
-            debug_dir = Path(__file__).parent.parent.parent / "debug_no_eyes"
-            os.makedirs(debug_dir, exist_ok=True)
-            debug_img = frame_bgr.copy()
-            if face_rect is not None:
-                dx, dy, dw, dh = face_rect
-                cv2.rectangle(debug_img, (dx, dy), (dx+dw, dy+dh), (0, 0, 255), 2)
-            save_path = debug_dir / f"fail_eye_{int(time.time()*1000)}.jpg"
-            cv2.imwrite(str(save_path), debug_img)
-        except Exception as e:
-            pass
+        now_ts = time.time()
+        can_save_debug = (
+            self.debug_save_failed_eyes and
+            (now_ts - self._last_debug_save_ts) >= self.debug_save_interval_sec
+        )
+
+        if can_save_debug:
+            try:
+                debug_dir = Path(__file__).parent.parent.parent / "debug_no_eyes"
+                os.makedirs(debug_dir, exist_ok=True)
+                debug_img = frame_bgr.copy()
+                if face_rect is not None:
+                    dx, dy, dw, dh = face_rect
+                    cv2.rectangle(debug_img, (dx, dy), (dx + dw, dy + dh), (0, 0, 255), 2)
+                save_path = debug_dir / f"fail_eye_{int(now_ts * 1000)}.jpg"
+                cv2.imwrite(str(save_path), debug_img)
+                self._last_debug_save_ts = now_ts
+            except Exception:
+                pass
 
         # 核心修改：绝对不要硬裁剪！直接告诉上层“我看不见”
         return None

@@ -13,6 +13,8 @@ import cv2
 import numpy as np
 import torch
 import torch.nn as nn
+import os
+import time
 from typing import Tuple, Optional, Dict, Any
 from pathlib import Path
 import logging
@@ -103,6 +105,11 @@ class ImprovedDecisionFusionDetector:
         # HSEmotion 状态追踪（用于诊断）
         self._hsemotion_error_count = 0
         self._hsemotion_available = True
+
+        # 调试落盘默认关闭，避免实时推理时高频 I/O 导致卡顿
+        self.debug_save_failed_eyes = os.getenv("EMOTISENSE_DEBUG_SAVE_FAILED_EYES", "0") == "1"
+        self.debug_save_interval_sec = float(os.getenv("EMOTISENSE_DEBUG_SAVE_INTERVAL_SEC", "2.0"))
+        self._last_debug_save_ts = 0.0
 
         # 备用检测器（当 HSEmotion 失败时）
         self._deepface_detector = None
@@ -336,104 +343,6 @@ class ImprovedDecisionFusionDetector:
             eye_region = cv2.resize(eye_region, self.EYE_REGION_SIZE)
 
         return eye_region
-    def extract_eye_region(self, frame_bgr: np.ndarray, 
-                          face_rect: Optional[Tuple[int, int, int, int]] = None) -> Optional[np.ndarray]:
-        """
-        从帧中提取眼睛区域 - 包含 Debug 存图功能和硬裁剪兜底
-        """
-        gray = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2GRAY)
-        eye_found = False
-        
-        # 🎯 尝试方法 1：Haar 级联检测
-        if face_rect is not None:
-            x, y, w, h = face_rect
-            upper_face_roi = gray[y:y+int(h*0.6), x:x+w]
-            
-            if upper_face_roi.size > 0:
-                eyes = self.eye_cascade.detectMultiScale(
-                    upper_face_roi, scaleFactor=1.1, minNeighbors=4, 
-                    minSize=(20, 20), maxSize=(w//2, int(h*0.3))
-                )
-                if len(eyes) > 0:
-                    ex, ey, ew, eh = max(eyes, key=lambda r: r[2]*r[3])
-                    eye_x, eye_y = x + ex, y + ey
-                    eye_roi = frame_bgr[eye_y:eye_y+eh, eye_x:eye_x+ew]
-                    if eye_roi.size > 0:
-                        eye_found = True
-                        return cv2.resize(eye_roi, self.EYE_REGION_SIZE)
-        
-        # 🎯 尝试方法 2：无人脸框时的全局检测
-        if not eye_found and face_rect is None:
-            eyes = self.eye_cascade.detectMultiScale(
-                gray, scaleFactor=1.1, minNeighbors=4, 
-                minSize=(30, 30), maxSize=(150, 100)
-            )
-            if len(eyes) > 0:
-                ex, ey, ew, eh = max(eyes, key=lambda r: r[2]*r[3])
-                eye_roi = frame_bgr[ey:ey+eh, ex:ex+ew]
-                if eye_roi.size > 0:
-                    eye_found = True
-                    return cv2.resize(eye_roi, self.EYE_REGION_SIZE)
-
-        # =========================================================
-        # 🚨 触发警告：如果走到这里，说明 Haar 检测失败了！
-        # =========================================================
-        logger.warning("⚠️ 未检测到眼睛，触发存图并启用硬裁剪兜底")
-        
-        # 1. Debug 存图逻辑：保存失败的图片
-        try:
-            import time
-            from pathlib import Path
-            import cv2
-            
-            # 在项目根目录创建一个 debug 文件夹
-            debug_dir = Path(__file__).parent.parent.parent / "debug_failed_eyes"
-            debug_dir.mkdir(parents=True, exist_ok=True)
-            
-            timestamp = int(time.time() * 1000)
-            save_path = debug_dir / f"failed_eye_{timestamp}.jpg"
-            
-            # 画个人脸红框，方便你看看检测器是在哪个区域内找眼睛失败的
-            debug_img = frame_bgr.copy()
-            if face_rect is not None:
-                bx, by, bw, bh = face_rect
-                cv2.rectangle(debug_img, (bx, by), (bx+bw, by+bh), (0, 0, 255), 2)
-                # 画出它搜索眼睛的“上半脸”区域 (绿色框)
-                cv2.rectangle(debug_img, (bx, by), (bx+bw, by+int(bh*0.6)), (0, 255, 0), 2)
-                
-            cv2.imwrite(str(save_path), debug_img)
-            # logger.info(f"📸 失败图片已保存至: {save_path}")
-        except Exception as e:
-            logger.error(f"保存 Debug 图片失败: {e}")
-
-        # 2. 终极兜底方案：几何比例硬裁剪 (Blind Crop)
-        # 不要返回 None，强行切出眼睛所在的大致位置送给模型！
-        if face_rect is not None:
-            x, y, w, h = face_rect
-        else:
-            x, y, w, h = 0, 0, frame_bgr.shape[1], frame_bgr.shape[0]
-
-        # 眼睛大概在面部 20% 到 50% 的高度区间，水平 10% 到 90% 的区间
-        eye_top = max(0, y + int(h * 0.20))
-        eye_bottom = min(frame_bgr.shape[0], y + int(h * 0.50))
-        eye_left = max(0, x + int(w * 0.10))
-        eye_right = min(frame_bgr.shape[1], x + int(w * 0.90))
-
-        eye_roi = frame_bgr[eye_top:eye_bottom, eye_left:eye_right]
-        
-        if eye_roi.size > 0:
-            return cv2.resize(eye_roi, self.EYE_REGION_SIZE)
-            
-        return None
-        """将眼部图片转换为模型输入"""
-        eye_region = cv2.resize(eye_img, self.TARGET_SIZE)
-        eye_region = cv2.cvtColor(eye_region, cv2.COLOR_BGR2RGB)
-        eye_region = eye_region.astype(np.float32) / 255.0
-        eye_region = eye_region.transpose(2, 0, 1)
-        mean = np.array([0.485, 0.456, 0.406]).reshape(3, 1, 1)
-        std = np.array([0.229, 0.224, 0.225]).reshape(3, 1, 1)
-        eye_region = (eye_region - mean) / std
-        return torch.from_numpy(eye_region).float().unsqueeze(0).to(self.device)
     def _get_eye_sad_prob(self, frame_bgr: np.ndarray,
                         face_rect: Optional[Tuple[int, int, int, int]] = None) -> float:
         """
@@ -849,28 +758,26 @@ class ImprovedDecisionFusionDetector:
             top_emotion, top_confidence, all_emotions = 'neutral', 50.0, {}
 
         # ==========================================
-        # Step 2：高置信度直通与门控拦截
+        # Step 2：高置信度直通 + 严格门控
         # ==========================================
         if top_confidence >= 80.0:
             return top_emotion, top_confidence
 
-        p_sad = float(all_emotions.get('sad', 0.0))
-        p_neutral = float(all_emotions.get('neutral', 0.0))
         is_target_top = (top_emotion in self.FUSION_TARGET_EMOTIONS)
 
+        # 关键修复：元学习器是 sad/neutral 二分类，不允许跨类改判 happy/surprise/angry 等情绪。
         if not is_target_top:
-            if top_confidence > 55.0 or (p_sad < 25.0 and p_neutral < 25.0):
-                return top_emotion, top_confidence
+            return top_emotion, top_confidence
 
         # ==========================================
-        # Step 3：获取眼睛概率 & 🚀 遮挡免疫机制 🚀
+        # Step 3：获取眼睛概率 & 遮挡免疫
         # ==========================================
         if face_rect is None:
             face_rect = self._detect_face_once(frame_bgr)
 
         P_eye = self._get_eye_sad_prob(frame_bgr, face_rect)
-        
-        # 🚨 戴了墨镜 / 闭眼 / 没找到眼睛 -> 局部专家瞎了，100% 听全局！
+
+        # 戴了墨镜 / 闭眼 / 没找到眼睛 -> 局部专家失效，听全局。
         if P_eye < 0:
             return top_emotion, top_confidence
 
@@ -878,17 +785,18 @@ class ImprovedDecisionFusionDetector:
         # Step 4：元学习器决策 (Meta-Learner)
         # ==========================================
         if self.use_meta_learner:
+            if self.meta_learner is None:
+                return top_emotion, top_confidence
+
             # 直接提取特征，省去嵌套调用
             features = MetaLearnerPrediction.extract_features(all_emotions, P_eye)
             meta_emotion, meta_conf = MetaLearnerPrediction.predict(self.meta_learner, features)
-            
-            if meta_emotion == 'abstain': 
+
+            if meta_emotion == 'abstain':
                 return top_emotion, top_confidence
-            if meta_conf < 55.0: 
+            if meta_conf < 55.0:
                 return top_emotion, top_confidence
-            if not is_target_top and meta_conf < 75.0: 
-                return top_emotion, top_confidence
-                
+
             return meta_emotion, meta_conf
 
         # ==========================================
@@ -906,9 +814,6 @@ class ImprovedDecisionFusionDetector:
         decision_strength = abs(var_final - 0.5) / 0.5
         confidence = 50.0 + (decision_strength * 50.0)
         confidence = float(max(0.0, min(100.0, confidence)))
-
-        if not is_target_top and confidence < 75.0:
-            return top_emotion, top_confidence
 
         return final_emotion, confidence
       
