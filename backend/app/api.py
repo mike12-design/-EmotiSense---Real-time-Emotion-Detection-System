@@ -1108,12 +1108,19 @@ async def get_status(db: Session = Depends(get_db)):
             }
             text_content = default_map.get(emotion, "")
 
+    # 用 pygame 实际播放状态，避免 state["music_playing"] 被 worker finally 秒关
+    try:
+        import pygame
+        is_playing = pygame.mixer.get_init() and pygame.mixer.music.get_busy()
+    except Exception:
+        is_playing = False
+
     return {
         "current_emotion": emotion,
         "mood_score": mood,
         "stress_level": stress,
         "should_intervene": should_intervene,
-        "music_playing": state.get("music_playing", False),
+        "music_playing": is_playing,
         "resource": {
             "text": text_content
         } if should_intervene else None
