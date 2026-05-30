@@ -125,6 +125,7 @@ const fetchUserList = async () => {
 const fetchAlertFeed = async () => {
   try {
     const params = { limit: alertLimit.value };
+    if (selectedUserId.value) params.user_id = selectedUserId.value;
     if (alertDateRange.value?.length === 2) {
       const fmt = d => {
         const p = n => String(n).padStart(2, '0');
