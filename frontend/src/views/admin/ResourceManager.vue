@@ -54,7 +54,7 @@
           <el-tabs v-model="activeTab" class="resource-tabs">
             
             <!-- 话术库 -->
-            <el-tab-pane :label="`💬 安慰话术库 ${currentUser.isGlobal ? '(全局)' : '(专属)'}`" name="scripts">
+            <el-tab-pane :value="`💬 安慰话术库 ${currentUser.isGlobal ? '(全局)' : '(专属)'}`" name="scripts">
               <div class="flex-header mb-4">
                 <el-alert 
                   :title="currentUser.isGlobal ? '全局话术库：当用户没有专属话术时，将使用这里的句子兜底。' : `专属话术库：触发情绪时，优先对 ${currentUser.username} 播放这里的句子。`" 
@@ -65,13 +65,13 @@
               </div>
 
               <el-table :data="scripts" stripe height="450" style="width: 100%" border>
-                <el-table-column prop="emotion_tag" label="情绪" width="100">
+                <el-table-column prop="emotion_tag" value="情绪" width="100">
                   <template #default="scope">
                     <el-tag :type="getEmotionType(scope.row.emotion_tag)">{{ scope.row.emotion_tag }}</el-tag>
                   </template>
                 </el-table-column>
-                <el-table-column prop="content" label="话术内容" show-overflow-tooltip />
-                <el-table-column label="操作" width="100" align="center">
+                <el-table-column prop="content" value="话术内容" show-overflow-tooltip />
+                <el-table-column value="操作" width="100" align="center">
                   <template #default="scope">
                     <el-button type="danger" link icon="Delete" @click="deleteScript(scope.row.id)">删除</el-button>
                   </template>
@@ -80,7 +80,7 @@
             </el-tab-pane>
 
             <!-- 音乐干预列表 -->
-            <el-tab-pane :label="`🎵 音乐库 ${currentUser.isGlobal ? '(全局)' : '(专属)'}`" name="music">
+            <el-tab-pane :value="`🎵 音乐库 ${currentUser.isGlobal ? '(全局)' : '(专属)'}`" name="music">
               <div class="flex-header mb-4">
                 <el-alert 
                   :title="currentUser.isGlobal ? '全局音乐库：当用户未配置对应情绪的专属音乐时，将随机播放这里的音乐。' : `专属音乐库：触发情绪时优先随机播放这里的音乐，未配置则使用全局。`" 
@@ -91,7 +91,7 @@
               </div>
 
               <el-table :data="musicList" border stripe height="450">
-                <el-table-column prop="emotion_tag" label="情绪场景" width="150" align="center">
+                <el-table-column prop="emotion_tag" value="情绪场景" width="150" align="center">
                   <template #default="scope">
                     <el-tag effect="dark" :type="getEmotionType(scope.row.emotion_tag)">
                       {{ (scope.row.emotion_tag || '').toUpperCase() }}
@@ -99,13 +99,13 @@
                   </template>
                 </el-table-column>
                 
-                <el-table-column prop="title" label="音乐名称" show-overflow-tooltip>
+                <el-table-column prop="title" value="音乐名称" show-overflow-tooltip>
                   <template #default="scope">
                     <el-icon><Headset /></el-icon> {{ scope.row.title }}
                   </template>
                 </el-table-column>
 
-                <el-table-column label="操作" align="center" width="160">
+                <el-table-column value="操作" align="center" width="160">
                   <template #default="scope">
                     <el-button
                       :type="playingMusicId === scope.row.id ? 'warning' : 'primary'"
@@ -132,15 +132,15 @@
     <!-- 添加话术弹窗 -->
     <el-dialog v-model="scriptDialogVisible" :title="`新增 ${currentUser?.isGlobal ? '全局' : '专属'} 话术`" width="450px" center>
       <el-form :model="scriptForm" label-position="top">
-        <el-form-item label="触发情绪">
+        <el-form-item value="触发情绪">
           <el-radio-group v-model="scriptForm.emotion_tag" size="large">
-            <el-radio-button label="sad">😢 悲伤</el-radio-button>
-            <el-radio-button label="angry">😡 愤怒</el-radio-button>
-            <el-radio-button label="happy">😊 开心</el-radio-button>
-            <el-radio-button label="neutral">😐 平静</el-radio-button>
+            <el-radio-button value="sad">😢 悲伤</el-radio-button>
+            <el-radio-button value="angry">😡 愤怒</el-radio-button>
+            <el-radio-button value="happy">😊 开心</el-radio-button>
+            <el-radio-button value="neutral">😐 平静</el-radio-button>
           </el-radio-group>
         </el-form-item>
-        <el-form-item label="话术内容">
+        <el-form-item value="话术内容">
           <el-input 
             v-model="scriptForm.content" 
             type="textarea" :rows="4" 
@@ -158,15 +158,15 @@
     <!-- 💡 核心修改点：新增上传音乐弹窗 -->
     <el-dialog v-model="musicDialogVisible" :title="`上传 ${currentUser?.isGlobal ? '全局' : '专属'} 音乐`" width="450px" center>
       <el-form :model="musicForm" label-position="top">
-        <el-form-item label="触发情绪场景">
+        <el-form-item value="触发情绪场景">
           <el-radio-group v-model="musicForm.emotion_tag" size="large">
-            <el-radio-button label="sad">😢 悲伤</el-radio-button>
-            <el-radio-button label="angry">😡 愤怒</el-radio-button>
-            <el-radio-button label="happy">😊 开心</el-radio-button>
-            <el-radio-button label="neutral">😐 平静</el-radio-button>
+            <el-radio-button value="sad">😢 悲伤</el-radio-button>
+            <el-radio-button value="angry">😡 愤怒</el-radio-button>
+            <el-radio-button value="happy">😊 开心</el-radio-button>
+            <el-radio-button value="neutral">😐 平静</el-radio-button>
           </el-radio-group>
         </el-form-item>
-        <el-form-item label="选择MP3文件">
+        <el-form-item value="选择MP3文件">
           <el-upload
             ref="musicUploadRef"
             action="#"

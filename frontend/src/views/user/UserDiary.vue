@@ -73,7 +73,7 @@
     >
       <el-form label-position="top">
         <!-- 补打卡或编辑时，允许修改时间 -->
-        <el-form-item label="记录时间">
+        <el-form-item value="记录时间">
           <el-date-picker
             v-model="form.timestamp"
             type="datetime"
@@ -84,7 +84,7 @@
           <span v-if="mode === 'create'" class="text-xs text-gray-400">默认为当前时间</span>
         </el-form-item>
 
-        <el-form-item label="你想说点什么？">
+        <el-form-item value="你想说点什么？">
           <el-input
             v-model="form.content"
             type="textarea"
@@ -93,12 +93,12 @@
           />
         </el-form-item>
 
-        <el-form-item label="心情状态">
+        <el-form-item value="心情状态">
           <el-radio-group v-model="form.emotion">
-            <el-radio-button label="Happy">😊 开心</el-radio-button>
-            <el-radio-button label="Neutral">😐 平静</el-radio-button>
-            <el-radio-button label="Sad">😢 难过</el-radio-button>
-            <el-radio-button label="Angry">😡 生气</el-radio-button>
+            <el-radio-button value="Happy">😊 开心</el-radio-button>
+            <el-radio-button value="Neutral">😐 平静</el-radio-button>
+            <el-radio-button value="Sad">😢 难过</el-radio-button>
+            <el-radio-button value="Angry">😡 生气</el-radio-button>
           </el-radio-group>
         </el-form-item>
       </el-form>

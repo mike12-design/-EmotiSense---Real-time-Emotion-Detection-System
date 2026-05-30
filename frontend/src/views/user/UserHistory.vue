@@ -9,9 +9,9 @@
             <span class="text-lg font-bold">情绪曲线</span>
           </div>
           <el-radio-group v-model="timeRange" size="small" @change="fetchChartData">
-            <el-radio-button label="day">今日</el-radio-button>
-            <el-radio-button label="week">本周</el-radio-button>
-            <el-radio-button label="month">本月</el-radio-button>
+            <el-radio-button value="day">今日</el-radio-button>
+            <el-radio-button value="week">本周</el-radio-button>
+            <el-radio-button value="month">本月</el-radio-button>
           </el-radio-group>
         </div>
       </template>
@@ -32,13 +32,13 @@
         <span class="font-bold">历史明细</span>
       </template>
       <el-table :data="logs" stripe style="width: 100%">
-        <el-table-column prop="timestamp" label="记录时间" width="180">
+        <el-table-column prop="timestamp" value="记录时间" width="180">
           <template #default="scope">
             {{ formatTime(scope.row.timestamp) }}
           </template>
         </el-table-column>
         
-        <el-table-column label="心情状态" width="150">
+        <el-table-column value="心情状态" width="150">
           <template #default="scope">
             <el-tag :type="getEmotionTag(scope.row.emotion)" effect="dark" round>
               {{ getEmoji(scope.row.emotion) }} {{ scope.row.emotion }}
@@ -47,7 +47,7 @@
         </el-table-column>
         
         <!-- 注意：列表里的 score 是置信度(0-1)，图表里的是插值分数(0-100) -->
-        <el-table-column label="AI置信度">
+        <el-table-column value="AI置信度">
           <template #default="scope">
             <el-progress 
               :percentage="Math.round(scope.row.score * 100)" 

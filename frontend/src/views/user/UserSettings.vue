@@ -438,7 +438,7 @@ const handleDeleteScript = async (id) => {
 
 const getEmotionTagType = (emotion) => {
   const map = { happy: 'success', sad: 'info', angry: 'danger', neutral: 'warning' };
-  return map[emotion.toLowerCase()] || '';
+  return map[emotion.toLowerCase()] || 'info';
 };
 const fetchUserMusic = async () => {
   try {
