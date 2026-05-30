@@ -151,10 +151,7 @@
                 <el-icon><component :is="sensing ? VideoPause : VideoPlay" /></el-icon>
                 {{ sensing ? '关闭感知' : '开启感知' }}
               </el-button>
-              <el-button class="btn-ctrl" size="small" @click="toggleFullscreen">
-                <el-icon><FullScreen /></el-icon>
-                {{ isFullscreen ? '退出全屏' : '全屏' }}
-              </el-button>
+
               <el-button
                 v-if="isIntervening || musicPlaying"
                 class="btn-stop-audio"
