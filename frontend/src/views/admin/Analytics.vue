@@ -433,7 +433,12 @@ onMounted(async () => {
   alertDateRange.value = [start, end];
 
   await fetchCurrentUser();
-  fetchUserList();
+  await fetchUserList();
+  // 默认选中第一个普通用户
+  const firstUser = nonAdminUsers.value[0];
+  if (firstUser && selectedUserId.value === currentUser.value?.id) {
+    handleUserSelect(firstUser.id);
+  }
   fetchAlertFeed();
 
   fetchTrajectoryData();
