@@ -1827,7 +1827,12 @@ async def get_alert_feed(
     events = events_query.order_by(desc(SystemEvent.timestamp)).limit(limit).all()
 
     for event in events:
-        event_username = event.username or "系统"
+        # 用数据库用户名，避免人脸识别名不一致
+        if event.user_id:
+            event_user = db.query(User).filter(User.id == event.user_id).first()
+            event_username = event_user.username if event_user else (event.username or "系统")
+        else:
+            event_username = event.username or "系统"
         event_data = {
             "timestamp": event.timestamp.strftime("%Y-%m-%d %H:%M:%S"),
             "username": event_username,
