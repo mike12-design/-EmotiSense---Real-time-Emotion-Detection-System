@@ -391,12 +391,9 @@ def find_identity(face_img: np.ndarray, face_db: list) -> str:
 
         # 4. 【关键：在所有对比结束后再做判断】
         if best_distance < THRESHOLD:
-            # 如果最好的匹配结果小于阈值，说明找到了
-            print(f"✅ 识别成功：{best_name} (距离：{best_distance:.4f})")
+            logger.debug(f"识别成功：{best_name} (距离：{best_distance:.4f})")
             return best_name
         else:
-            # 否则即便有"最接近的人"，也不认为是同一个人
-            # print(f"❌ 识别失败：最接近 {best_name} 但距离 ({best_distance:.4f}) 超过阈值")
             return "Stranger"
 
     except Exception as e:
