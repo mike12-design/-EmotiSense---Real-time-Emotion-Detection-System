@@ -2615,9 +2615,11 @@ async def admin_delete_user(user_id: int, db: Session = Depends(get_db)):
     # 禁止删除自己（通过前端传 id 限制，这里做兜底）
     # 同时删除关联数据
     db.query(EmotionLog).filter(EmotionLog.user_id == user_id).delete()
+    db.query(SystemEvent).filter(SystemEvent.user_id == user_id).delete()
     db.query(Diary).filter(Diary.user_id == user_id).delete()
     db.query(MusicLibrary).filter(MusicLibrary.user_id == user_id).delete()
     db.query(ComfortScript).filter(ComfortScript.user_id == user_id).delete()
+    db.query(UserHiddenGlobal).filter(UserHiddenGlobal.user_id == user_id).delete()
 
     username = user.username
     db.delete(user)
