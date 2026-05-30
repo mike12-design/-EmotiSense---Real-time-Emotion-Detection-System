@@ -80,6 +80,7 @@
           :http-request="handleMusicUpload"
           :show-file-list="false"
           accept=".mp3"
+          :disabled="!musicEmotion"
         >
           <el-button type="primary">上传音乐</el-button>
         </el-upload>
@@ -328,10 +329,6 @@ const confirmCapture = async () => {
 // 2. 音乐上传逻辑 (新增)
 // ==========================================
 const handleMusicUpload = async (options) => {
-  if (!musicEmotion.value) {
-    ElMessage.warning("请先选择情绪标签")
-    return
-  }
   const formData = new FormData()
   formData.append("file", options.file)
   formData.append("emotion", musicEmotion.value)
