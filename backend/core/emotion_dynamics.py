@@ -2,7 +2,7 @@
 import time
 from collections import deque
 
-NEGATIVE_EMOTIONS = {"sad", "angry", "fear", "disgust"}
+NEGATIVE_EMOTIONS = {"sad", "angry", "fear", "disgust", "neutral"}
 
 class EmotionDynamicsEngine:
     """情绪动力学引擎 — 基于稳定器输出的滑动窗口投票触发干预"""
