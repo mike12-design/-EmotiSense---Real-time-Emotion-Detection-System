@@ -73,8 +73,6 @@ class AudioManager:
         """核心逻辑：从数据库随机获取一首音乐 (优先级：专属 > 全局，排除用户隐藏的全局资源)"""
         from .models import UserHiddenGlobal
 
-        logger.info(f"🔍 查找音乐: emotion={emotion}, username={username}")
-
         target_music_list = []
 
         # 1. 尝试获取专属音乐
@@ -86,11 +84,6 @@ class AudioManager:
                     MusicLibrary.emotion_tag == emotion,
                     MusicLibrary.is_active == True
                 ).all()
-                logger.info(f"🔍 专属音乐查询: user_id={user.id}, found={len(target_music_list)}")
-            else:
-                logger.warning(f"🔍 用户 {username} 在 users 表中不存在")
-        else:
-            logger.info(f"🔍 跳过专属查询: username={repr(username)}")
 
         # 2. 如果专属音乐库为空，则获取全局音乐（排除该用户隐藏的）
         if not target_music_list:
@@ -99,8 +92,17 @@ class AudioManager:
                 MusicLibrary.emotion_tag == emotion,
                 MusicLibrary.is_active == True
             )
+            if username and username != "Stranger":
+                user = db.query(User).filter(User.username == username).first()
+                if user:
+                    hidden_ids = [h.item_id for h in db.query(UserHiddenGlobal).filter(
+                        UserHiddenGlobal.user_id == user.id,
+                        UserHiddenGlobal.item_type == "music"
+                    ).all()]
+                    if hidden_ids:
+                        global_query = global_query.filter(~MusicLibrary.id.in_(hidden_ids))
+
             target_music_list = global_query.all()
-            logger.info(f"🔍 全局音乐查询: found={len(target_music_list)}")
 
         # 3. 如果找到了资源，随机选一个返回
         if target_music_list:
