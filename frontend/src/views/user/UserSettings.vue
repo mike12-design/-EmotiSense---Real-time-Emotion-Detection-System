@@ -80,7 +80,6 @@
           :http-request="handleMusicUpload"
           :show-file-list="false"
           accept=".mp3"
-          :disabled="!musicEmotion"
         >
           <el-button type="primary">上传音乐</el-button>
         </el-upload>
@@ -329,6 +328,14 @@ const confirmCapture = async () => {
 // 2. 音乐上传逻辑 (新增)
 // ==========================================
 const handleMusicUpload = async (options) => {
+  if (!musicEmotion.value) {
+    await ElMessageBox.confirm(
+      '请先在上方下拉框中选择情绪标签（开心/难过/愤怒/平静），然后再次点击上传',
+      '需要选择情绪',
+      { confirmButtonText: '知道了', showCancelButton: false, type: 'warning' }
+    )
+    return
+  }
   const formData = new FormData()
   formData.append("file", options.file)
   formData.append("emotion", musicEmotion.value)
