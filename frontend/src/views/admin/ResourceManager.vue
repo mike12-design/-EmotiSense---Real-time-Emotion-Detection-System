@@ -253,7 +253,7 @@ const fetchUsers = async () => {
 
 
     if (!currentUser.value && userList.value.length > 0) {
-      handleUserSelect(userList.value)
+      handleUserSelect(userList.value[0])
     }
   } catch (e) {
     ElMessage.error('用户列表加载失败')
