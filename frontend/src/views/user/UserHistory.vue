@@ -157,7 +157,7 @@ const initChart = (data) => {
       name: '情绪指数',
       data: data.scores,
       type: 'line',
-      smooth: 0.5, // 0.5 的平滑度比较自然
+      smooth: 0.2, // 轻微平滑，保留数值波动可见
       lineStyle: { width: 4 },
       symbol: 'circle',
       symbolSize: 8,

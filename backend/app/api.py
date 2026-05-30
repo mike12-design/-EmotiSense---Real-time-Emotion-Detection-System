@@ -1054,40 +1054,16 @@ async def get_my_history_stats(username: str, range_type: str = 'day', db: Sessi
         label_func = lambda t: t.strftime('%Y-%m-%d')
     # -------------------------------------------------------
 
-    # 4. 定义情绪目标分数 (100=极乐, 50=平静, 0=愤怒)
-    TARGET_SCORES = {
-        "happy": 100,
-        "surprise": 85,
-        "neutral": 50,   # 基准线
-        "fear": 40,
-        "sad": 20,
-        "angry": 0,
-        "disgust": 0
-    }
-    
-    BASE_SCORE = 50.0 # 平静基准分
+    # 4. 数据库的 score 字段存的是 (mood_score + 1) / 2，已经是 0-1 的心情指数
+    #    直接 ×100 映射到 0-100 图表分，不再做 lerp 插值（那会导致 sad 被二次压低）
     bucket = defaultdict(list)
 
-    # 5. 遍历日志，计算插值分数
     for log in logs:
-        emotion_key = log.emotion.lower()
-        
-        # 获取置信度 (数据库存的可能是 0-100 的整数，需要归一化到 0.0-1.0)
-        confidence = log.score
-        if confidence > 1.0:
-            confidence = confidence / 100.0
-
-        # 获取该情绪的目标极值
-        target = TARGET_SCORES.get(emotion_key, 50)
-        
-        # ⭐ 核心算法：线性插值 (Lerp)
-        # 公式：当前分 = 平静分 + (目标分 - 平静分) * 置信度
-        # 例子1 (Happy, 0.8): 50 + (100 - 50) * 0.8 = 90 分
-        # 例子2 (Sad, 0.5):   50 + (20 - 50) * 0.5 = 35 分
-        real_score = BASE_SCORE + (target - BASE_SCORE) * confidence
-        
-        # 限制范围在 0-100 防止溢出
-        real_score = max(0, min(100, real_score))
+        # score 是 0-1 的心情指数，直接转百分比
+        score = log.score
+        if score > 1.0:
+            score = score / 100.0  # 兼容旧数据（可能存了 0-100 的整数）
+        real_score = score * 100  # 0 → 0, 0.5 → 50, 1 → 100
         
         # 分组聚合
         label = label_func(log.timestamp)
