@@ -1,0 +1,128 @@
+You are an expert academic presentation designer who creates Apple Keynote-level minimalist slide decks from research papers.
+
+Task: Convert the following academic paper into a professional, extremely clean slide deck.
+
+First, carefully read and analyze the entire paper. Then create a logical, high-impact slide structure that captures the core value and key findings without losing academic rigor.
+
+**Content Strategy:**
+- Focus on the most important content: Research background/problem, Research gap, Objectives, Methodology (high-level), Key results/findings (use visuals/charts), Discussion/Implications, Conclusion, and Future work.
+- One clear idea per slide. Keep text extremely minimal (large title + 3-6 lines max per slide).
+- Prioritize insights and "so what" over raw details.
+- Turn complex data into simple charts, diagrams, or before-after comparisons when possible.
+- Use short, powerful bullet points or even better — replace bullets with icons + short phrases.
+
+**Visual Style (strictly follow):**
+
+Create a professional, extremely minimalist presentation slide deck in the style of modern Apple Keynote.
+
+Design principles:
+- Mostly clean white or very light warm off-white background (#FAFAFA or subtle warm tone)
+- Generous white space and breathing room, Swiss-style grid layout
+- Large, bold sans-serif titles (like SF Pro or Neue Haas Grotesk), plenty of hierarchy
+- Very sparse content: one main idea per slide, minimal text, large fonts
+- Subtle accent color only (soft blue #0071E3 or muted teal/gray), used sparingly as highlights
+- Simple geometric shapes, thin lines, subtle shadows or very light depth
+- High-end product photography feel: clean lighting, soft gradients if any, no clutter
+- Photography style: studio lighting, shallow depth of field when using images, premium feel
+
+Strictly avoid: flashy backgrounds, gradients on background, lens flares, glowing effects, heavy shadows, colorful illustrations, clipart, complex charts, bullet overload, clutter.
+
+Each slide must feel premium, calm, and confident like Apple's keynotes.
+
+**Output Format:**
+1. First output the full slide outline (Slide 1: Title, Slide 2: ..., including suggested title and key content for each slide).
+2. Then generate each slide one by one in detail, following the visual style above.
+
+---
+
+**论文题目**：基于人脸识别的情绪关怀系统（EmotiSense — Real-time Emotion Detection System）
+
+**论文摘要**：
+如今，随着计算机视觉与深度学习的发展，基于视频流的人脸识别系统逐渐应用于智能陪伴、心理健康帮助以及人机交互等领域。传统的基于情感识别的关怀系统通常仅采用单一模型进行判定，容易受到光照、阴影等因素影响，识别准确率及鲁棒性均不高。此外，部分系统无法进行长期连续分析，缺乏主动反馈与情绪干预能力，难以满足实际应用需求。
+
+本文研究的目的是通过多模型融合实现实时情绪识别。系统从摄像头获取视频流，在此基础上使用 YOLOv8 检测人脸并返回人脸属性信息，随后利用 OpenCV 对视频图像进行预处理，加载 HSEmotion 全局情绪模型和基于 ResNet 的眼部微表情模型进行特征提取，并利用元学习器进行决策融合，以提高系统在复杂环境下的情绪识别精度与鲁棒性。用户可通过浏览器访问系统，页面简洁，便于后续扩展。
+
+该系统实现了用户登录、人脸识别、实时情绪识别以及情绪日记等功能，同时增加了音乐干预、语音安慰与分析功能。系统可持续记录用户情绪变化趋势，并根据情绪状态自动触发干预操作。本系统能够对用户情绪进行监测并做出智能反馈，使情绪识别系统更加智能化，对智能陪伴与心理健康辅助具有一定的应用价值。
+
+关键词：计算机视觉，多模型融合，微表情识别，人脸情绪检测
+
+**以下为论文各章节关键内容摘要**，请据此构建幻灯片结构：
+
+---
+
+**第1章 绪论**
+- 研究背景：情绪识别研究逐渐走进心理健康咨询、智能陪伴、远程医疗及人机交互等生活场景
+- 问题：传统方法使用单模型或手工提取特征，在复杂光照、局部遮挡、微表情不明显等情况下识别率与鲁棒性较差；缺乏连续分析和主动介入机制
+- 研究现状：
+  - 国内：复旦大学王龑老师对静态和动态面部表情识别技术进行了归纳总结
+  - 国外：AffectNet、RAF-DB 等大规模公开数据集；DeepFace、HSEmotion、OpenFace 等开源工具；Konuk 等人提出 EfficientFER 模型
+  - 未来方向：多模态融合（视觉+语音+生理信号+文本语义）、引入注意力机制与对比学习、边缘设备实时推理、与大语言模型结合
+- 研究意义：技术上验证多模型在易混淆情绪（特别是中性 vs 悲伤）判别中的有效性；将情绪识别从"感知"拓展到"响应"
+
+**第2章 相关技术介绍**
+- Python 3.10：高级解释型语言，简洁高效
+- OpenCV 4.11.0：开源计算机视觉库，负责视频流读取与图像预处理
+- YOLOv8：单阶段目标检测算法，用于实时人脸检测与定位
+- SQLite 3.1：轻量嵌入式关系型数据库，存储用户、情绪日志、系统事件等数据
+- 情绪平滑方法：滑动窗口多投票机制，维护固定长度预测序列，统计窗口内众数作为稳定输出，抑制"情绪闪烁"
+- 多模型融合：
+  - 眼部 ResNet18 模型：K 折交叉验证训练，分层学习率微调（Sad/Neutral 两类样本），224×224 像素输入
+  - 元学习器融合：从 HSEmotion 输出的 5 类情绪概率 + 眼部模型 Sad 概率 → 拼接为 6 维特征向量 → 送入分类器（逻辑回归）进行二分类（Sad/Neutral）
+  - 准确率从 71.94% 提升至 72.80%，Neutral 召回率从 0.60 提升至 0.66
+
+**第3章 系统分析**
+- 系统功能概述：视频流采集 → YOLOv8 人脸检测 → 多模型融合情绪识别 → 趋势分析 → 智能干预 → 数据存储
+- 运行环境：Python 3.10 / YOLOv8 / OpenCV 4.11.0 / SQLite 3.1
+- 用例图：两种角色——管理员（用户管理、资源管理、数据分析、日志查看）和普通用户（实时监控、历史统计、日记、个人资源管理）
+- 模块流程图：登录模块、情绪监控模块、视频流处理模块、干预事件记录模块、资源与用户管理模块
+- 可行性分析：技术可行（成熟开源技术栈）、社会可行（心理健康需求增长）、经济可行（开源框架+轻量级 SQLite，低部署成本）
+
+**第4章 系统设计**
+- 三层架构：展示层（Vue 3 + Element Plus）、业务逻辑层（FastAPI）、数据层（SQLite）
+- API 设计：约 45 个 FastAPI 路由，涵盖认证、视频流、情绪分析、日记 CRUD、资源管理、管理员分析仪表盘等
+- 数据库设计：7 张核心表——用户信息表、情绪日志表、系统事件表、日记表、音乐资源库表、安慰话术库表、用户隐藏全局资源表
+- E-R 图：用户与情绪日志、系统事件、日记、资源之间的一对多关系
+
+**第5章 系统实现**
+- 数据收集：从网络公开数据集收集 Sad/Neutral 人脸图像，标注并裁切眼部区域
+- 模型训练：
+  - 眼部模型：ResNet18，224×224 输入，15 轮训练，保存为 .pth
+  - 元学习器：抽取 Sad/Neutral 样本，提取 6 维特征，比较逻辑回归/SVM/随机森林/梯度提升树四种分类器，选最优保存为 .pkl
+- 前端页面（10个）：
+  - 用户端：登录页面、我的概览首页（当日情绪概览+日历+饼状图）、实时监控页面（人脸框+情绪标签+置信度）、心情足迹页面（日/周/月折线图）、日记管理页面、系统设置页面（个人音乐/话术/密码）
+  - 管理员端：数据分析页面（高危预警+情绪轨迹+饼图+四象限散点图）、用户管理页面（CRUD+人脸录入）、资源管理页面（全局音乐/话术库）、系统日志页面
+
+**第6章 系统测试**
+- 登录功能测试：正确/错误用户名密码、角色跳转、未登录拦截——全部通过
+- 情绪功能测试：摄像头连接、人脸检测、情绪识别、智能干预触发、数据库记录、无人脸处理——全部通过
+- 资源管理测试：音乐/话术的增删查——全部通过
+- 用户管理测试：增删改查+人脸录入+权限拦截——全部通过
+
+**结论**
+- 主要工作：介绍了情绪识别技术及应用前景；详细说明多模型融合方法（Sad/Neutral 准确率由 71.94% 提升至 72.80%）；设计 7 张核心数据库表；实现情绪监测、历史统计、智能干预等核心模块；完成登录/情绪/资源/用户管理测试
+- 系统优势：实时视频情绪识别+趋势分析+智能干预，降低人工干预程度
+- 不足与展望：识别维度较单一（仅视觉，缺少语音/文本）；多人场景个体情绪识别能力有限；干预方式有限。未来引入多模态识别、AI 对话陪伴功能
+
+---
+
+**PPT 结构建议**：
+
+请基于以上论文内容，生成约 12-15 页幻灯片。建议结构如下：
+
+1. **封面** — 论文题目 + 作者信息 + 导师信息 + 学校
+2. **目录/议程** — 本次汇报的章节概览
+3. **研究背景** — 情绪识别的应用场景与需求增长
+4. **问题与挑战** — 传统单模型方法的三大痛点
+5. **研究目标** — 本文要解决什么、实现什么
+6. **技术方案总览** — 系统整体架构图（从摄像头到干预的全流程）
+7. **核心技术：多模型融合** — HSEmotion + 眼部 ResNet18 + 元学习器，6 维特征向量
+8. **核心技术：情绪平滑与智能干预** — 滑动窗口多投票 + 音乐/TTS 干预机制
+9. **系统设计** — 三层架构 + 技术栈（Vue 3 / FastAPI / SQLite）
+10. **系统功能展示** — 10 个前端页面概览（可用图标+简短描述）
+11. **关键实验结果** — Sad/Neutral 二分类准确率对比（71.94% → 72.80%），Neutral 召回率提升（0.60 → 0.66）
+12. **系统测试** — 四类测试全部通过，系统可靠
+13. **创新点总结** — 多模型融合 + 眼部微表情 + 智能干预闭环
+14. **不足与展望** — 当前局限 + 未来多模态/大模型方向
+15. **致谢** — 感谢指导教师与同学
+
+请严格按照上述结构生成完整的幻灯片内容。每页幻灯片保持极简风格，突出关键信息和数据，避免大段文字堆砌。

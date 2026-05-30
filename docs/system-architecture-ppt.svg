@@ -1,0 +1,86 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900" role="img" aria-labelledby="title desc">
+  <title id="title">EmotiSense 系统整体结构图</title>
+  <desc id="desc">EmotiSense 实时情绪检测系统 PPT 简洁版整体架构图</desc>
+  <defs>
+    <style>
+      .bg { fill: #f7faf9; }
+      .title { font: 700 42px "Microsoft YaHei", "PingFang SC", Arial, sans-serif; fill: #12342f; }
+      .subtitle { font: 400 20px "Microsoft YaHei", "PingFang SC", Arial, sans-serif; fill: #536a65; }
+      .layer-title { font: 700 28px "Microsoft YaHei", "PingFang SC", Arial, sans-serif; fill: #12342f; }
+      .card-title { font: 700 24px "Microsoft YaHei", "PingFang SC", Arial, sans-serif; fill: #12342f; }
+      .card-text { font: 400 18px "Microsoft YaHei", "PingFang SC", Arial, sans-serif; fill: #36514c; }
+      .note { font: 400 18px "Microsoft YaHei", "PingFang SC", Arial, sans-serif; fill: #536a65; }
+      .layer { fill: #ffffff; stroke: #d8e6e2; stroke-width: 2; rx: 24; }
+      .card { stroke-width: 2.5; rx: 18; }
+      .blue { fill: #e8f1fb; stroke: #9dbadd; }
+      .green { fill: #e8f5ef; stroke: #98c8b7; }
+      .purple { fill: #f1ecfb; stroke: #baa8df; }
+      .yellow { fill: #fff6df; stroke: #dec27c; }
+      .arrow { stroke: #55726c; stroke-width: 4; fill: none; marker-end: url(#arrow); }
+      .thin { stroke-width: 3; }
+    </style>
+    <marker id="arrow" markerWidth="14" markerHeight="14" refX="12" refY="7" orient="auto">
+      <path d="M2,2 L12,7 L2,12 Z" fill="#55726c"/>
+    </marker>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="130%">
+      <feDropShadow dx="0" dy="8" stdDeviation="8" flood-color="#213b36" flood-opacity="0.10"/>
+    </filter>
+  </defs>
+
+  <rect class="bg" width="1600" height="900"/>
+
+  <text class="title" x="90" y="82">EmotiSense 实时情绪检测系统整体结构图</text>
+  <text class="subtitle" x="90" y="120">前端采集与展示 · 后端服务调度 · 多模型融合识别 · 情绪分析与智能干预</text>
+
+  <rect class="layer" x="90" y="165" width="1420" height="145" filter="url(#shadow)"/>
+  <text class="layer-title" x="130" y="225">前端展示层</text>
+  <rect class="card blue" x="360" y="190" width="300" height="92"/>
+  <text class="card-title" x="395" y="227">用户端</text>
+  <text class="card-text" x="395" y="258">实时监控 · 历史 · 日记</text>
+  <rect class="card blue" x="720" y="190" width="300" height="92"/>
+  <text class="card-title" x="755" y="227">管理员端</text>
+  <text class="card-text" x="755" y="258">用户 · 资源 · 数据分析</text>
+  <rect class="card blue" x="1080" y="190" width="300" height="92"/>
+  <text class="card-title" x="1115" y="227">交互方式</text>
+  <text class="card-text" x="1115" y="258">REST API · 视频流</text>
+
+  <path class="arrow" d="M800 312 L800 355"/>
+
+  <rect class="layer" x="90" y="355" width="1420" height="145" filter="url(#shadow)"/>
+  <text class="layer-title" x="130" y="415">后端服务层</text>
+  <rect class="card green" x="360" y="380" width="300" height="92"/>
+  <text class="card-title" x="395" y="417">FastAPI 接口</text>
+  <text class="card-text" x="395" y="448">登录 · 监控 · 统计</text>
+  <rect class="card green" x="720" y="380" width="300" height="92"/>
+  <text class="card-title" x="755" y="417">视频流处理</text>
+  <text class="card-text" x="755" y="448">摄像头读取 · 帧预处理</text>
+  <rect class="card green" x="1080" y="380" width="300" height="92"/>
+  <text class="card-title" x="1115" y="417">数据管理</text>
+  <text class="card-text" x="1115" y="448">SQLite · 情绪日志 · 日记</text>
+
+  <path class="arrow" d="M800 502 L800 545"/>
+
+  <rect class="layer" x="90" y="545" width="1420" height="145" filter="url(#shadow)"/>
+  <text class="layer-title" x="130" y="605">AI 识别层</text>
+  <rect class="card purple" x="360" y="570" width="300" height="92"/>
+  <text class="card-title" x="395" y="607">人脸检测</text>
+  <text class="card-text" x="395" y="638">OpenCV · YOLOv8</text>
+  <rect class="card purple" x="720" y="570" width="300" height="92"/>
+  <text class="card-title" x="755" y="607">情绪识别</text>
+  <text class="card-text" x="755" y="632">DeepFace · HSEmotion</text>
+  <text class="card-text" x="755" y="656">眼部模型</text>
+  <rect class="card purple" x="1080" y="570" width="300" height="92"/>
+  <text class="card-title" x="1115" y="607">结果融合</text>
+  <text class="card-text" x="1115" y="632">元学习器融合</text>
+  <text class="card-text" x="1115" y="656">滑动窗口平滑</text>
+
+  <path class="arrow" d="M800 692 L800 735"/>
+
+  <rect class="layer" x="90" y="735" width="1420" height="105" filter="url(#shadow)"/>
+  <text class="layer-title" x="130" y="800">分析与干预层</text>
+  <rect class="card yellow" x="430" y="758" width="330" height="58"/>
+  <text class="card-title" x="465" y="795">情绪趋势分析</text>
+  <rect class="card yellow" x="810" y="758" width="330" height="58"/>
+  <text class="card-title" x="845" y="795">音乐 / TTS 智能干预</text>
+  
+</svg>

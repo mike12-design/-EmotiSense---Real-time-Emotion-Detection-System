@@ -1,0 +1,91 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900" role="img" aria-labelledby="title desc">
+  <title id="title">眼部模型与全局模型融合方法</title>
+  <desc id="desc">EmotiSense 眼部模型和全局情绪模型的元学习器融合流程图</desc>
+  <defs>
+    <style>
+      .bg { fill: #f7faf9; }
+      .title { font: 700 42px "Microsoft YaHei", "PingFang SC", Arial, sans-serif; fill: #12342f; }
+      .subtitle { font: 400 20px "Microsoft YaHei", "PingFang SC", Arial, sans-serif; fill: #536a65; }
+      .section { font: 700 26px "Microsoft YaHei", "PingFang SC", Arial, sans-serif; fill: #12342f; }
+      .card-title { font: 700 24px "Microsoft YaHei", "PingFang SC", Arial, sans-serif; fill: #12342f; }
+      .card-text { font: 400 18px "Microsoft YaHei", "PingFang SC", Arial, sans-serif; fill: #36514c; }
+      .small { font: 400 16px "Microsoft YaHei", "PingFang SC", Arial, sans-serif; fill: #536a65; }
+      .layer { fill: #ffffff; stroke: #d8e6e2; stroke-width: 2; rx: 24; }
+      .card { stroke-width: 2.5; rx: 18; }
+      .blue { fill: #e8f1fb; stroke: #9dbadd; }
+      .green { fill: #e8f5ef; stroke: #98c8b7; }
+      .purple { fill: #f1ecfb; stroke: #baa8df; }
+      .yellow { fill: #fff6df; stroke: #dec27c; }
+      .red { fill: #fff0ed; stroke: #dfaaa0; }
+      .chip { fill: #ffffff; stroke: #c7d8d3; stroke-width: 2; rx: 15; }
+      .arrow { stroke: #55726c; stroke-width: 4; fill: none; marker-end: url(#arrow); }
+      .soft-arrow { stroke: #7f938e; stroke-width: 3; fill: none; marker-end: url(#arrow); stroke-dasharray: 8 8; }
+    </style>
+    <marker id="arrow" markerWidth="14" markerHeight="14" refX="12" refY="7" orient="auto">
+      <path d="M2,2 L12,7 L2,12 Z" fill="#55726c"/>
+    </marker>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="130%">
+      <feDropShadow dx="0" dy="8" stdDeviation="8" flood-color="#213b36" flood-opacity="0.10"/>
+    </filter>
+  </defs>
+
+  <rect class="bg" width="1600" height="900"/>
+
+  <text class="title" x="90" y="82">眼部模型与全局模型融合方法</text>
+  <text class="subtitle" x="90" y="120">全脸概率负责整体判断，眼部专家补充 Sad/Neutral 分辨，元学习器完成融合。</text>
+
+  <rect class="layer" x="90" y="165" width="1420" height="145" filter="url(#shadow)"/>
+  <text class="section" x="130" y="225">输入</text>
+  <rect class="card blue" x="350" y="190" width="300" height="92"/>
+  <text class="card-title" x="385" y="227">摄像头视频帧</text>
+  <text class="card-text" x="385" y="258">OpenCV 预处理</text>
+  <rect class="card blue" x="740" y="190" width="300" height="92"/>
+  <text class="card-title" x="775" y="227">人脸检测</text>
+  <text class="card-text" x="775" y="258">YOLOv8 定位人脸 ROI</text>
+  <rect class="card blue" x="1130" y="190" width="300" height="92"/>
+  <text class="card-title" x="1165" y="227">区域划分</text>
+  <text class="card-text" x="1165" y="258">全脸区域 + 眼部区域</text>
+
+  <path class="arrow" d="M1280 312 L1280 362"/>
+  <path class="arrow" d="M1280 362 C1280 390, 1030 390, 1030 430"/>
+  <path class="arrow" d="M1280 362 C1280 390, 570 390, 570 430"/>
+
+  <rect class="layer" x="90" y="380" width="1420" height="190" filter="url(#shadow)"/>
+  <text class="section" x="130" y="455">双路特征提取</text>
+  <rect class="card green" x="330" y="420" width="410" height="110"/>
+  <text class="card-title" x="365" y="458">全局情绪模型</text>
+  <text class="card-text" x="365" y="490">HSEmotion / DeepFace</text>
+  <text class="card-text" x="365" y="518">输出多类情绪概率</text>
+  <rect class="card purple" x="860" y="420" width="410" height="110"/>
+  <text class="card-title" x="895" y="458">眼部专家模型</text>
+  <text class="card-text" x="895" y="490">ResNet18 眼部区域分类</text>
+  <text class="card-text" x="895" y="518">输出 P_eye_sad</text>
+
+  <path class="arrow" d="M535 532 L690 630"/>
+  <path class="arrow" d="M1065 532 L910 630"/>
+
+  <rect class="layer" x="90" y="620" width="1420" height="135" filter="url(#shadow)"/>
+  <text class="section" x="130" y="690">特征拼接</text>
+  <rect class="card yellow" x="390" y="638" width="820" height="86"/>
+  <text class="card-title" x="430" y="670">6 维融合特征</text>
+  <text class="card-text" x="430" y="698">[P_sad, P_neutral, P_eye_sad]</text>
+  <text class="card-text" x="430" y="718">[P_angry, P_happy, P_surprise]</text>
+
+  <path class="arrow" d="M800 756 L800 780"/>
+
+  <rect class="layer" x="90" y="780" width="1420" height="82" filter="url(#shadow)"/>
+  <text class="section" x="130" y="830">融合决策</text>
+  <rect class="card red" x="390" y="794" width="320" height="48"/>
+  <text class="card-title" x="430" y="826">元学习器分类</text>
+  <rect class="card red" x="760" y="794" width="300" height="48"/>
+  <text class="card-title" x="800" y="826">Sad / Neutral</text>
+  <rect class="card red" x="1110" y="794" width="300" height="48"/>
+  <text class="card-title" x="1150" y="826">置信度输出</text>
+
+  <path class="arrow" d="M710 818 L758 818"/>
+  <path class="arrow" d="M1060 818 L1108 818"/>
+
+  <rect class="chip" x="970" y="595" width="420" height="40"/>
+  <text class="small" x="995" y="621">保护策略：全局模型高置信判断其他情绪时优先保留全局结果</text>
+  <path class="soft-arrow" d="M535 532 C630 590, 820 592, 970 615"/>
+</svg>
