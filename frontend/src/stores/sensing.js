@@ -130,11 +130,11 @@ export const useSensingStore = defineStore('sensing', () => {
     sensing.value = false
     feedReady.value = false
     axios.post(`${API_BASE}/api/camera/stop`).catch(() => {})
-    axios.post(`${API_BASE}/api/camera/release`).catch(() => {})
   }
 
   const resetStore = () => {
     cleanup()
+    axios.post(`${API_BASE}/api/camera/release`).catch(() => {})
     currentEmotion.value = 'Neutral'
     isIntervening.value = false
     musicPlaying.value = false
