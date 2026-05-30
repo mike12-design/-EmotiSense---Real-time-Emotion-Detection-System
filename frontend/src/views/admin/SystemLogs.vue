@@ -57,13 +57,6 @@
           <div class="stat-label">{{ selectedUser ? '当前用户' : '活跃用户数' }}</div>
         </div>
       </div>
-      <div class="stat-card">
-        <div class="stat-icon" style="background:#fef0f0;color:#f56c6c"><TrendCharts /></div>
-        <div class="stat-body">
-          <div class="stat-value">{{ stats.avg_mood }}</div>
-          <div class="stat-label">平均心情分</div>
-        </div>
-      </div>
       <div class="stat-card dominant">
         <div class="stat-icon" :style="{ background: emotionColorBg(stats.dominant_emotion), color: emotionColor(stats.dominant_emotion) }">
           <span class="big-emoji">{{ getEmoji(stats.dominant_emotion) }}</span>
@@ -178,7 +171,7 @@ const daysFilter = ref('7')
 
 const stats = reactive({
   total_count: 0, today_count: 0, active_users: 0,
-  avg_mood: 0, dominant_emotion: '', emotion_distribution: []
+  dominant_emotion: '', emotion_distribution: []
 })
 
 const emotions = [
