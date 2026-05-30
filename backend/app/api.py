@@ -230,8 +230,11 @@ class VideoCapture:
     摄像头控制类：负责打开摄像头、读取原始帧。
     """
 
-    def __init__(self, index=0):
+    def __init__(self, index=0, width=640, height=480):
         self.cap = cv2.VideoCapture(index)
+        if self.cap and self.cap.isOpened():
+            self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, width)
+            self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
         self._released = False
         self._read_lock = threading.Lock()
         self._latest_frame = None
