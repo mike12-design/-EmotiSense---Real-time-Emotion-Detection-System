@@ -102,8 +102,8 @@ advanced_analyzer = AdvancedEmotionAnalyzer()   # 吸引子模型、RMSSD 分析
 last_logged_emotion = None      # 上次写入数据库的情绪
 last_db_log_time = 0            # 上次写入时间戳
 
-WRITE_INTERVAL = 5              # 秒 - 写入节流间隔
-EMOTION_CHANGE_MIN_DURATION = 3 # 秒 - 情绪持续时间阈值 (超过此值才考虑写入)
+WRITE_INTERVAL = 3              # 秒 - 写入节流间隔
+EMOTION_CHANGE_MIN_DURATION = 1.5 # 秒 - 情绪持续时间阈值 (超过此值才考虑写入)
 
 emotion_since_time = time.time()  # 当前情绪开始的时间
 

@@ -136,20 +136,20 @@ const initChart = (data) => {
     },
     yAxis: {
       type: 'value',
-      min: 0,
-      max: 100,
-      interval: 20, // 强制分为 5 个刻度区间
+      min: (value) => Math.max(0, Math.floor((value.min - 20) / 10) * 10),
+      max: (value) => Math.min(100, Math.ceil((value.max + 20) / 10) * 10),
+      interval: undefined, // 自动算刻度
       splitLine: { lineStyle: { type: 'dashed', color: '#f0f0f0' } },
       axisLabel: {
         color: '#888',
-        fontSize: 16, // Emoji 稍微大一点
+        fontSize: 16,
         formatter: (value) => {
-          if (value >= 90) return '😆'; // 狂喜
-          if (value >= 70) return '🙂'; // 开心
-          if (value === 50) return '😐'; // 平静
-          if (value <= 30) return '😢'; // 难过
-          if (value <= 10) return '🤬'; // 愤怒
-          return ''; 
+          if (value >= 90) return '😆';
+          if (value >= 70) return '🙂';
+          if (value === 50) return '😐';
+          if (value <= 30) return '😢';
+          if (value <= 10) return '🤬';
+          return '';
         }
       }
     },
