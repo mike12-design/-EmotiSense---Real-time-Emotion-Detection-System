@@ -4,14 +4,15 @@ import os
 import asyncio
 import logging
 import random
+import subprocess
+import platform
 from pathlib import Path
 from sqlalchemy.orm import Session
-from .models import MusicLibrary, User  # 🔹 修复：相对导入
+from .models import MusicLibrary, User
 logger = logging.getLogger("AudioManager")
 
 class AudioManager:
     def __init__(self):
-        # 初始化 Pygame 音频混合器
         try:
             pygame.mixer.init()
             logger.info("音频系统初始化成功")
@@ -20,52 +21,53 @@ class AudioManager:
 
         self.assets_dir = Path(__file__).parent.parent / "assets"
         self.current_emotion = None
-        self.current_music_path = None # 记录当前播放的文件路径
-        self.is_speaking = False 
+        self.current_music_path = None
+        self.is_speaking = False
+        self._music_process = None  # macOS afplay 子进程
+
+    def _is_playing(self):
+        """检查音乐是否正在播放"""
+        if self._music_process is not None:
+            if self._music_process.poll() is None:
+                return True
+            self._music_process = None
+        if pygame.mixer.get_init():
+            return pygame.mixer.music.get_busy()
+        return False
 
     def play_music_for_emotion(self, emotion: str, db: Session, username: str = None):
-        """
-        根据情绪播放背景音乐 (支持多文件随机抽取)
-        
-        Args:
-            emotion: 检测到的情绪标签
-            db: 数据库会话
-            username: 当前识别到的用户名（用于检索专属资源）
-        """
-        # 1. 音量管理：如果正在说话，保持低音量
-        if self.is_speaking:
-            pygame.mixer.music.set_volume(0.2)
-        else:
-            pygame.mixer.music.set_volume(1.0)
-
-        # 2. 状态检查：如果情绪没变且音乐正在播放，则不中断
-        if emotion == self.current_emotion and pygame.mixer.music.get_busy():
+        if self._is_playing():
             return
 
-        # 3. 检索音乐资源
         music_record = self._get_random_music(emotion, db, username)
-        
         if not music_record:
             logger.warning(f"情绪 {emotion} 未找到任何(专属或全局)音乐资源")
             return
 
-        # 4. 播放音乐（filepath 可能是绝对路径或相对路径，统一处理）
         file_path = Path(music_record.filepath)
         if not file_path.is_absolute():
             file_path = self.assets_dir.parent / file_path
-        if file_path.exists():
-            try:
-                # 记录状态
-                self.current_emotion = emotion
-                self.current_music_path = str(file_path)
-                
-                pygame.mixer.music.load(str(file_path))
-                pygame.mixer.music.play(0)  # 播完一首即停，不循环
-                logger.info(f"正在播放音乐: [{emotion}] {music_record.title}")
-            except Exception as e:
-                logger.error(f"播放失败: {e}")
-        else:
+        if not file_path.exists():
             logger.error(f"数据库记录的文件不存在: {file_path}")
+            return
+
+        try:
+            self.current_emotion = emotion
+            self.current_music_path = str(file_path)
+
+            # macOS: 用 afplay 播放，兼容所有音频格式
+            if platform.system() == "Darwin":
+                self._music_process = subprocess.Popen(
+                    ["afplay", str(file_path)],
+                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+                )
+            else:
+                pygame.mixer.music.load(str(file_path))
+                pygame.mixer.music.play(0)
+
+            logger.info(f"正在播放音乐: [{emotion}] {music_record.title}")
+        except Exception as e:
+            logger.error(f"播放失败: {e}")
 
     def _get_random_music(self, emotion: str, db: Session, username: str = None):
         """核心逻辑：从数据库随机获取一首音乐 (优先级：专属 > 全局，排除用户隐藏的全局资源)"""
@@ -109,38 +111,45 @@ class AudioManager:
         return None
 
     async def play_comfort_voice(self, text):
-        """生成并播放 TTS 语音 (保持逻辑不变)"""
         if not text:
             return
 
         self.is_speaking = True
-        pygame.mixer.music.set_volume(0.1) 
 
         output_file = self.assets_dir / "tts_output.mp3"
-        
         try:
             communicate = edge_tts.Communicate(text, "zh-CN-XiaoxiaoNeural")
             await communicate.save(str(output_file))
-            
-            # 暂停背景音乐
-            pygame.mixer.music.pause()
-            
-            # 播放语音
-            sound = pygame.mixer.Sound(str(output_file))
-            sound.play()
-            
-            duration = sound.get_length()
-            await asyncio.sleep(duration)
-            
-            # 恢复背景音乐
-            pygame.mixer.music.unpause()
-            pygame.mixer.music.set_volume(1.0)
-            
+
+            # macOS: 用 afplay 播 TTS
+            if platform.system() == "Darwin":
+                proc = subprocess.Popen(
+                    ["afplay", str(output_file)],
+                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+                )
+                proc.wait()
+            else:
+                pygame.mixer.music.pause()
+                sound = pygame.mixer.Sound(str(output_file))
+                sound.play()
+                await asyncio.sleep(sound.get_length())
+                pygame.mixer.music.unpause()
         except Exception as e:
             logger.error(f"TTS 错误: {e}")
         finally:
             self.is_speaking = False
 
     def stop(self):
-        pygame.mixer.music.stop()
+        if self._music_process is not None:
+            try:
+                self._music_process.terminate()
+                self._music_process.wait(timeout=1)
+            except Exception:
+                try:
+                    self._music_process.kill()
+                except Exception:
+                    pass
+            self._music_process = None
+        if pygame.mixer.get_init():
+            pygame.mixer.music.stop()
         self.current_emotion = None
