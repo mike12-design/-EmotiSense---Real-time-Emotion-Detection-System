@@ -737,7 +737,7 @@ def gen_from_video():
 
             # 每隔 N 帧送一帧给分析线
             if frame_idx % ANALYZE_EVERY_N == 0:
-                pending_frame = raw
+                pending_frame = cv2.flip(raw, 1)  # 与显示线程同步翻转，确保 YOLO 检测坐标与镜像画面一致
                 frame_ready.set()
 
             # 轻量显示：翻转 + 叠加最新分析结果 + 编码

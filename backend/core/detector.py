@@ -242,7 +242,11 @@ class EmotionDetector:
         self.emotion_model = None
         self.anger_threshold = config.get('emotion.anger_threshold', 50)
 
-    def analyze_emotion(self, face_img: np.ndarray) -> Tuple[str, float]:
+    def analyze_emotion(
+        self,
+        frame_bgr: np.ndarray,
+        face_rect: Optional[Tuple[int, int, int, int]] = None
+    ) -> Tuple[str, float]:
         """
         Analyze emotion from face image.
 
@@ -254,6 +258,14 @@ class EmotionDetector:
         """
         try:
             # Analyze emotion using DeepFace
+            if face_rect is not None:
+                x, y, w, h = face_rect
+                x, y = max(0, int(x)), max(0, int(y))
+                w, h = int(w), int(h)
+                face_img = frame_bgr[y:y + h, x:x + w]
+            else:
+                face_img = frame_bgr
+
             result = DeepFace.analyze(
                 face_img,
                 actions=['emotion'],
