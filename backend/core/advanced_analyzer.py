@@ -120,9 +120,14 @@ class AdvancedEmotionAnalyzer:
             # 1. 获取基础效价
             valence = self.valence_map(emotion)
 
-            # 2. 计算最终情绪值：V_final = Valence × score (score 已是 0-1)
+            # 2. 计算最终情绪值
+            #    neutral 的效价为 0，会导致所有 neutral 点挤在 0 上
+            #    改用 (score - 0.5) * 2 让心情指数可反映情绪偏向
             normalized_score = score
-            v_final = valence * normalized_score
+            if emotion.lower() == "neutral":
+                v_final = (normalized_score - 0.5) * 2  # 0.5→0, 0.3→-0.4, 0.7→+0.4
+            else:
+                v_final = valence * normalized_score
 
             timestamps.append(timestamp)
             v_final_values.append(v_final)

@@ -1687,7 +1687,9 @@ async def get_advanced_analytics(
         },
         "suggestions": suggestions,
         "valence_history": [
-            {"timestamp": log.timestamp.isoformat(), "value": float(log.score * advanced_analyzer.valence_map(log.emotion))}
+            {"timestamp": log.timestamp.isoformat(),
+             "value": float((log.score - 0.5) * 2) if log.emotion.lower() == "neutral"
+                      else float(log.score * advanced_analyzer.valence_map(log.emotion))}
             for log in logs[-20:]  # 最近 20 条用于前端展示
         ]
     }
