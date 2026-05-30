@@ -65,48 +65,120 @@
     </el-card>
 
     <!-- 写日记/编辑日记 弹窗 -->
-    <el-dialog
-      v-model="showDialog"
-      :title="dialogTitle"
-      width="500px"
-      @close="resetForm"
-    >
-      <el-form label-position="top">
-        <!-- 补打卡或编辑时，允许修改时间 -->
-        <el-form-item value="记录时间">
-          <el-date-picker
-            v-model="form.timestamp"
-            type="datetime"
-            placeholder="选择时间"
-            style="width: 100%"
-            :disabled="mode === 'create'"
-          />
-          <span v-if="mode === 'create'" class="text-xs text-gray-400">默认为当前时间</span>
-        </el-form-item>
+    <Teleport to="body">
+      <transition name="dialog">
+        <div
+          v-if="showDialog"
+          class="dialog-overlay"
+          @click.self="showDialog = false"
+          @keydown.escape="showDialog = false"
+        >
+          <div
+            class="dialog-panel"
+            role="dialog"
+            aria-modal="true"
+            :aria-label="dialogTitle"
+          >
+            <!-- 头部 -->
+            <div class="dialog-header">
+              <div class="dialog-header-icon">
+                <span class="text-2xl">{{ mode === 'create' ? '✍️' : mode === 'patch' ? '📅' : '✏️' }}</span>
+              </div>
+              <div class="dialog-header-text">
+                <h2 class="dialog-title">{{ dialogTitle }}</h2>
+                <p class="dialog-subtitle">
+                  {{ mode === 'create' ? '记录此刻的心情' : mode === 'patch' ? '补写过去的心情' : '修改你的记录' }}
+                </p>
+              </div>
+              <button class="dialog-close" @click="showDialog = false" aria-label="关闭">
+                <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M5 5l10 10M15 5L5 15" />
+                </svg>
+              </button>
+            </div>
 
-        <el-form-item value="你想说点什么？">
-          <el-input
-            v-model="form.content"
-            type="textarea"
-            :rows="4"
-            placeholder="写下你现在的感受..."
-          />
-        </el-form-item>
+            <!-- 内容区 -->
+            <div class="dialog-body">
+              <!-- 时间 -->
+              <div class="field-group">
+                <label class="field-label">
+                  <svg class="field-label-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+                  记录时间
+                </label>
+                <el-date-picker
+                  v-model="form.timestamp"
+                  type="datetime"
+                  placeholder="选择时间"
+                  style="width: 100%"
+                  :disabled="mode === 'create'"
+                  class="field-datepicker"
+                />
+                <span v-if="mode === 'create'" class="field-hint">默认为当前时间</span>
+              </div>
 
-        <el-form-item value="心情状态">
-          <el-radio-group v-model="form.emotion">
-            <el-radio-button value="Happy">😊 开心</el-radio-button>
-            <el-radio-button value="Neutral">😐 平静</el-radio-button>
-            <el-radio-button value="Sad">😢 难过</el-radio-button>
-            <el-radio-button value="Angry">😡 生气</el-radio-button>
-          </el-radio-group>
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="showDialog = false">取消</el-button>
-        <el-button type="primary" @click="submitDiary" :loading="submitting">保存</el-button>
-      </template>
-    </el-dialog>
+              <!-- 内容 -->
+              <div class="field-group">
+                <label class="field-label">
+                  <svg class="field-label-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+                  你想说点什么？
+                </label>
+                <div class="textarea-wrapper">
+                  <textarea
+                    ref="contentRef"
+                    v-model="form.content"
+                    class="field-textarea"
+                    :rows="4"
+                    placeholder="写下你现在的感受..."
+                    maxlength="500"
+                    @input="contentLength = form.content.length"
+                  ></textarea>
+                  <span class="textarea-counter">{{ contentLength }}/500</span>
+                </div>
+              </div>
+
+              <!-- 心情状态 -->
+              <div class="field-group">
+                <label class="field-label">
+                  <svg class="field-label-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>
+                  心情状态
+                </label>
+                <div class="emotion-grid" role="radiogroup" :aria-label="'选择心情'">
+                  <button
+                    v-for="emo in emotions"
+                    :key="emo.value"
+                    class="emotion-card"
+                    :class="{ 'emotion-card--active': form.emotion === emo.value }"
+                    :style="{ '--emo-accent': emo.color, '--emo-accent-bg': emo.bg }"
+                    role="radio"
+                    :aria-checked="form.emotion === emo.value"
+                    :aria-label="emo.label"
+                    @click="form.emotion = emo.value"
+                  >
+                    <span class="emotion-card-emoji">{{ emo.emoji }}</span>
+                    <span class="emotion-card-label">{{ emo.label }}</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- 底部 -->
+            <div class="dialog-footer">
+              <button class="btn-cancel" @click="showDialog = false">取消</button>
+              <button
+                class="btn-submit"
+                :disabled="submitting"
+                @click="submitDiary"
+              >
+                <svg v-if="submitting" class="btn-spinner" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                  <path d="M12 2a10 10 0 109.95 11" />
+                </svg>
+                {{ submitting ? '保存中...' : '保存' }}
+              </button>
+            </div>
+          </div>
+        </div>
+      </transition>
+    </Teleport>
   </div>
 </template>
 
@@ -126,6 +198,14 @@ const username = localStorage.getItem('user');
 // 搜索与筛选
 const searchKeyword = ref('');
 const searchDate = ref(null);
+const contentLength = ref(0);
+
+const emotions = [
+  { value: 'Happy',   label: '开心', emoji: '😊', color: '#34d399', bg: 'rgba(52,211,153,0.12)' },
+  { value: 'Neutral', label: '平静', emoji: '😐', color: '#7dd3fc', bg: 'rgba(125,211,252,0.12)' },
+  { value: 'Sad',     label: '难过', emoji: '😢', color: '#60a5fa', bg: 'rgba(96,165,250,0.12)' },
+  { value: 'Angry',   label: '生气', emoji: '😡', color: '#f87171', bg: 'rgba(248,113,113,0.12)' },
+];
 
 // 表单相关
 const mode = ref('create'); // 'create' | 'patch' (补卡) | 'edit'
@@ -251,6 +331,7 @@ const submitDiary = async () => {
 const resetForm = () => {
   form.value = { content: '', emotion: 'Neutral', timestamp: new Date() };
   currentId.value = null;
+  contentLength.value = 0;
 };
 
 // --- 工具函数 ---
@@ -268,6 +349,7 @@ onMounted(fetchDiaries);
 </script>
 
 <style scoped>
+/* ===== 页面布局 ===== */
 .user-diary {
   max-width: 1000px;
   margin: 0 auto;
@@ -290,7 +372,313 @@ onMounted(fetchDiaries);
   transform: translateY(-2px);
 }
 
-/* 简单的 Flex 工具类 */
+/* ===== 弹窗覆盖层 ===== */
+.dialog-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(15, 23, 42, 0.5);
+  backdrop-filter: blur(4px);
+}
+
+/* ===== 弹窗面板 ===== */
+.dialog-panel {
+  width: 100%;
+  max-width: 480px;
+  max-height: 90vh;
+  overflow-y: auto;
+  background: #fff;
+  border-radius: 20px;
+  box-shadow:
+    0 25px 50px -12px rgba(0, 0, 0, 0.25),
+    0 0 0 1px rgba(14, 165, 233, 0.08);
+}
+
+/* ===== 头部 ===== */
+.dialog-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 24px 24px 0;
+}
+
+.dialog-header-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #e0f2fe, #bae6fd);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.dialog-header-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.dialog-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  color: #0f172a;
+  line-height: 1.3;
+}
+
+.dialog-subtitle {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: #94a3b8;
+}
+
+.dialog-close {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  border: none;
+  background: #f1f5f9;
+  color: #64748b;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: all 0.15s;
+}
+.dialog-close:hover {
+  background: #e2e8f0;
+  color: #0f172a;
+}
+.dialog-close:focus-visible {
+  outline: 2px solid #0ea5e9;
+  outline-offset: 2px;
+}
+
+/* ===== 内容区 ===== */
+.dialog-body {
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.field-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.field-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #475569;
+}
+
+.field-label-icon {
+  color: #94a3b8;
+  flex-shrink: 0;
+}
+
+.field-hint {
+  font-size: 12px;
+  color: #94a3b8;
+  margin-top: 2px;
+}
+
+/* 日期选择器 */
+.field-datepicker :deep(.el-input__wrapper) {
+  border-radius: 10px;
+  box-shadow: 0 0 0 1px #e2e8f0;
+  transition: box-shadow 0.15s;
+}
+.field-datepicker :deep(.el-input__wrapper:hover) {
+  box-shadow: 0 0 0 1px #cbd5e1;
+}
+
+/* 文本域 */
+.textarea-wrapper {
+  position: relative;
+}
+
+.field-textarea {
+  width: 100%;
+  padding: 12px 14px;
+  font-size: 14px;
+  font-family: inherit;
+  line-height: 1.6;
+  color: #1e293b;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  resize: vertical;
+  transition: border-color 0.15s, box-shadow 0.15s;
+  box-sizing: border-box;
+}
+.field-textarea::placeholder {
+  color: #94a3b8;
+}
+.field-textarea:focus {
+  outline: none;
+  border-color: #0ea5e9;
+  box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.15);
+  background: #fff;
+}
+
+.textarea-counter {
+  position: absolute;
+  bottom: 8px;
+  right: 12px;
+  font-size: 11px;
+  color: #94a3b8;
+  pointer-events: none;
+}
+
+/* ===== 情绪卡片 ===== */
+.emotion-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+}
+
+.emotion-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 14px 8px;
+  border-radius: 14px;
+  border: 2px solid transparent;
+  background: #f8fafc;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  font-family: inherit;
+}
+.emotion-card:hover {
+  background: var(--emo-accent-bg, #f1f5f9);
+  transform: translateY(-2px);
+}
+.emotion-card:focus-visible {
+  outline: 2px solid #0ea5e9;
+  outline-offset: 2px;
+}
+
+.emotion-card--active {
+  border-color: var(--emo-accent, #0ea5e9);
+  background: var(--emo-accent-bg, rgba(14,165,233,0.1));
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.emotion-card-emoji {
+  font-size: 28px;
+  line-height: 1;
+}
+
+.emotion-card-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #475569;
+}
+
+/* ===== 底部按钮 ===== */
+.dialog-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 0 24px 24px;
+}
+
+.btn-cancel {
+  padding: 10px 20px;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  color: #475569;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+  font-family: inherit;
+}
+.btn-cancel:hover {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+}
+.btn-cancel:focus-visible {
+  outline: 2px solid #0ea5e9;
+  outline-offset: 2px;
+}
+
+.btn-submit {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 24px;
+  border-radius: 12px;
+  border: none;
+  background: linear-gradient(135deg, #0ea5e9, #0284c7);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: inherit;
+  box-shadow: 0 4px 12px rgba(14, 165, 233, 0.3);
+}
+.btn-submit:hover {
+  box-shadow: 0 6px 20px rgba(14, 165, 233, 0.4);
+  transform: translateY(-1px);
+}
+.btn-submit:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+.btn-submit:focus-visible {
+  outline: 2px solid #0ea5e9;
+  outline-offset: 2px;
+}
+
+.btn-spinner {
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ===== 过渡动画 ===== */
+.dialog-enter-active {
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.dialog-leave-active {
+  transition: all 0.15s ease-in;
+}
+
+.dialog-enter-from {
+  opacity: 0;
+}
+.dialog-enter-from .dialog-panel {
+  transform: scale(0.95) translateY(10px);
+  opacity: 0;
+}
+
+.dialog-leave-to {
+  opacity: 0;
+}
+.dialog-leave-to .dialog-panel {
+  transform: scale(0.95) translateY(10px);
+  opacity: 0;
+}
+
+/* ===== Flex 工具类 ===== */
 .flex { display: flex; }
 .flex-col { flex-direction: column; }
 .justify-between { justify-content: space-between; }
