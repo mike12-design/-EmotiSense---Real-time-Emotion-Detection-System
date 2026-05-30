@@ -20,7 +20,7 @@ class EmotionDynamicsEngine:
         # 可调参数
         self.WINDOW_SIZE = 20
         self.NEGATIVE_RATIO = 0.7
-        self.COOLDOWN = 120
+        self.COOLDOWN = 30
 
     def valence_map(self, emotion):
         mapping = {
