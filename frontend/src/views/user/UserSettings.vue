@@ -338,8 +338,10 @@ const handleMusicUpload = async (options) => {
     await axios.post(`${API_BASE}/api/user/upload_music`, formData)
     ElMessage.success("上传成功")
     fetchUserMusic()
-  } catch {
-    ElMessage.error("上传失败")
+  } catch (e) {
+    const msg = e.response?.data?.detail || e.message || "未知错误"
+    console.error("音乐上传失败:", e)
+    ElMessage.error(`上传失败: ${msg}`)
   }
 }
 
