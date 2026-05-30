@@ -127,7 +127,7 @@
                     ref="contentRef"
                     v-model="form.content"
                     class="field-textarea"
-                    :rows="4"
+                    :rows="6"
                     placeholder="写下你现在的感受..."
                     maxlength="500"
                     @input="contentLength = form.content.length"
@@ -380,7 +380,6 @@ onMounted(fetchDiaries);
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 20px;
   background: rgba(15, 23, 42, 0.5);
   backdrop-filter: blur(4px);
 }
@@ -388,7 +387,8 @@ onMounted(fetchDiaries);
 /* ===== 弹窗面板 ===== */
 .dialog-panel {
   width: 100%;
-  max-width: 480px;
+  max-width: 520px;
+  margin: 24px;
   max-height: 90vh;
   overflow-y: auto;
   background: #fff;
@@ -510,10 +510,11 @@ onMounted(fetchDiaries);
 
 .field-textarea {
   width: 100%;
-  padding: 12px 14px;
-  font-size: 14px;
+  min-height: 140px;
+  padding: 14px 16px;
+  font-size: 15px;
   font-family: inherit;
-  line-height: 1.6;
+  line-height: 1.7;
   color: #1e293b;
   background: #f8fafc;
   border: 1px solid #e2e8f0;
