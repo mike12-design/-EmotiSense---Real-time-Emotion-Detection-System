@@ -432,15 +432,12 @@ onMounted(async () => {
   start.setDate(start.getDate() - 3);
   alertDateRange.value = [start, end];
 
-  await fetchCurrentUser();
   await fetchUserList();
   // 默认选中第一个普通用户
-  const firstUser = nonAdminUsers.value[0];
-  if (firstUser && selectedUserId.value === currentUser.value?.id) {
-    handleUserSelect(firstUser.id);
+  if (nonAdminUsers.value.length > 0) {
+    selectedUserId.value = nonAdminUsers.value[0].id;
   }
   fetchAlertFeed();
-
   fetchTrajectoryData();
   fetchSystemHealth();
   window.addEventListener('resize', handleResize);
