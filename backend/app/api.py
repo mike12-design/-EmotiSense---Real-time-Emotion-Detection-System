@@ -726,6 +726,9 @@ def gen_from_video():
         frame_idx = 0
         none_streak = 0  # 连续空帧计数，超过阈值判定摄像头已释放
         MAX_NONE_STREAK = 5
+        FPS_TARGET = 15
+        FRAME_INTERVAL = 1.0 / FPS_TARGET
+        last_frame_ts = 0.0
         while True:
             if local_stop.is_set():
                 logger.info("🔴 [视频流] 显示循环退出：收到停止信号")
@@ -748,6 +751,13 @@ def gen_from_video():
                 continue
 
             none_streak = 0
+
+            # FPS 限流：避免帧洪水冲垮浏览器主线程
+            now = time.time()
+            elapsed = now - last_frame_ts
+            if elapsed < FRAME_INTERVAL:
+                time.sleep(FRAME_INTERVAL - elapsed)
+            last_frame_ts = time.time()
 
             frame_idx += 1
             if frame_idx == 1:
