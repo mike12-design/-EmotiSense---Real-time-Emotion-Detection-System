@@ -14,12 +14,12 @@ class EmotionDynamicsEngine:
         self.trigger_intervention = False
 
         # 滑动窗口：记录稳定器每次输出的情绪
-        self.window = deque(maxlen=10)   # 约 1.3 秒填满
+        self.window = deque(maxlen=20)   # 约 100 秒
         self.last_intervention = 0
 
         # 可调参数
-        self.WINDOW_SIZE = 10
-        self.NEGATIVE_RATIO = 0.5
+        self.WINDOW_SIZE = 20
+        self.NEGATIVE_RATIO = 0.7
         self.COOLDOWN = 30
 
     def valence_map(self, emotion):
