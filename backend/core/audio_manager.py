@@ -55,10 +55,10 @@ class AudioManager:
             self.current_emotion = emotion
             self.current_music_path = str(file_path)
 
-            # macOS: 用 afplay 播放，兼容所有音频格式
+            # macOS: 用 ffplay 播放，兼容所有音频格式
             if platform.system() == "Darwin":
                 self._music_process = subprocess.Popen(
-                    ["afplay", str(file_path)],
+                    ["ffplay", "-nodisp", "-autoexit", "-loglevel", "quiet", str(file_path)],
                     stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
                 )
             else:
@@ -121,10 +121,10 @@ class AudioManager:
             communicate = edge_tts.Communicate(text, "zh-CN-XiaoxiaoNeural")
             await communicate.save(str(output_file))
 
-            # macOS: 用 afplay 播 TTS
+            # macOS: 用 ffplay 播 TTS
             if platform.system() == "Darwin":
                 proc = subprocess.Popen(
-                    ["afplay", str(output_file)],
+                    ["ffplay", "-nodisp", "-autoexit", "-loglevel", "quiet", str(output_file)],
                     stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
                 )
                 proc.wait()
