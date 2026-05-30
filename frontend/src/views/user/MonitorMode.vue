@@ -91,7 +91,7 @@
               </transition-group>
               <div v-if="recentLogs.length === 0" class="empty-state">
                 <span class="empty-emoji">👋</span>
-                <p class="empty-text">等待 AI 接入...</p>
+                <p class="empty-text">点击「开启感知」开始</p>
               </div>
             </div>
           </div>
