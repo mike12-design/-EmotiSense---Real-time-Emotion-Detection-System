@@ -54,7 +54,7 @@
           <el-tabs v-model="activeTab" class="resource-tabs">
             
             <!-- 话术库 -->
-            <el-tab-pane :value="`💬 安慰话术库 ${currentUser.isGlobal ? '(全局)' : '(专属)'}`" name="scripts">
+            <el-tab-pane :label="`💬 安慰话术库 ${currentUser.isGlobal ? '(全局)' : '(专属)'}`" name="scripts">
               <div class="flex-header mb-4">
                 <el-alert 
                   :title="currentUser.isGlobal ? '全局话术库：当用户没有专属话术时，将使用这里的句子兜底。' : `专属话术库：触发情绪时，优先对 ${currentUser.username} 播放这里的句子。`" 
@@ -80,7 +80,7 @@
             </el-tab-pane>
 
             <!-- 音乐干预列表 -->
-            <el-tab-pane :value="`🎵 音乐库 ${currentUser.isGlobal ? '(全局)' : '(专属)'}`" name="music">
+            <el-tab-pane :label="`🎵 音乐库 ${currentUser.isGlobal ? '(全局)' : '(专属)'}`" name="music">
               <div class="flex-header mb-4">
                 <el-alert 
                   :title="currentUser.isGlobal ? '全局音乐库：当用户未配置对应情绪的专属音乐时，将随机播放这里的音乐。' : `专属音乐库：触发情绪时优先随机播放这里的音乐，未配置则使用全局。`" 
@@ -198,7 +198,7 @@
 import { ref, onMounted, computed } from 'vue'
 import axios from 'axios'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Menu, Setting, Upload, Plus, Delete, Headset, VideoPlay, VideoPause } from '@element-plus/icons-vue'
+import { Menu, Setting, Upload, Plus, Delete, Headset, VideoPlay, VideoPause, Refresh } from '@element-plus/icons-vue'
 
 const API_BASE = "http://127.0.0.1:8000"
 
@@ -262,6 +262,8 @@ const fetchUsers = async () => {
 
 const handleUserSelect = (user) => {
   currentUser.value = user
+  const idx = userList.value.findIndex(u => u.id === user.id)
+  if (idx !== -1) activeUserIndex.value = idx.toString()
   fetchScripts()
   fetchMusic()
 }
