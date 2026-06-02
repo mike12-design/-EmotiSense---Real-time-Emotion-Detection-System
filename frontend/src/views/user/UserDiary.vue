@@ -99,35 +99,14 @@
 
             <!-- 内容区 -->
             <div class="dialog-body">
-              <!-- 时间 -->
+              <!-- 内容（优先） -->
               <div class="field-group">
-                <label class="field-label">
-                  <svg class="field-label-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
-                  记录时间
-                </label>
-                <el-date-picker
-                  v-model="form.timestamp"
-                  type="datetime"
-                  placeholder="选择时间"
-                  style="width: 100%"
-                  :disabled="mode === 'create'"
-                  class="field-datepicker"
-                />
-                <span v-if="mode === 'create'" class="field-hint">默认为当前时间</span>
-              </div>
-
-              <!-- 内容 -->
-              <div class="field-group">
-                <label class="field-label">
-                  <svg class="field-label-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
-                  你想说点什么？
-                </label>
                 <div class="textarea-wrapper">
                   <textarea
                     ref="contentRef"
                     v-model="form.content"
                     class="field-textarea"
-                    :rows="6"
+                    :rows="10"
                     placeholder="写下你现在的感受..."
                     maxlength="500"
                     @input="contentLength = form.content.length"
@@ -138,10 +117,7 @@
 
               <!-- 心情状态 -->
               <div class="field-group">
-                <label class="field-label">
-                  <svg class="field-label-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>
-                  心情状态
-                </label>
+                <label class="field-label">心情状态</label>
                 <div class="emotion-grid" role="radiogroup" :aria-label="'选择心情'">
                   <button
                     v-for="emo in emotions"
@@ -158,6 +134,18 @@
                     <span class="emotion-card-label">{{ emo.label }}</span>
                   </button>
                 </div>
+              </div>
+
+              <!-- 时间（仅补卡/编辑时显示） -->
+              <div v-if="mode !== 'create'" class="field-group">
+                <label class="field-label">记录时间</label>
+                <el-date-picker
+                  v-model="form.timestamp"
+                  type="datetime"
+                  placeholder="选择时间"
+                  style="width: 100%"
+                  class="field-datepicker"
+                />
               </div>
             </div>
 
@@ -387,7 +375,7 @@ onMounted(fetchDiaries);
 /* ===== 弹窗面板 ===== */
 .dialog-panel {
   width: 100%;
-  max-width: 520px;
+  max-width: 560px;
   margin: 24px;
   max-height: 90vh;
   overflow-y: auto;
@@ -461,10 +449,10 @@ onMounted(fetchDiaries);
 
 /* ===== 内容区 ===== */
 .dialog-body {
-  padding: 20px 24px;
+  padding: 24px 28px;
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 22px;
 }
 
 .field-group {
@@ -510,17 +498,17 @@ onMounted(fetchDiaries);
 
 .field-textarea {
   width: 100%;
-  min-height: 140px;
-  padding: 14px 16px;
+  min-height: 260px;
+  padding: 18px 20px;
   font-size: 15px;
   font-family: inherit;
-  line-height: 1.7;
+  line-height: 1.8;
   color: #1e293b;
   background: #f8fafc;
   border: 1px solid #e2e8f0;
-  border-radius: 12px;
-  resize: vertical;
-  transition: border-color 0.15s, box-shadow 0.15s;
+  border-radius: 14px;
+  resize: none;
+  transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
   box-sizing: border-box;
 }
 .field-textarea::placeholder {
@@ -553,9 +541,9 @@ onMounted(fetchDiaries);
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 6px;
-  padding: 14px 8px;
-  border-radius: 14px;
+  gap: 8px;
+  padding: 18px 8px 14px;
+  border-radius: 16px;
   border: 2px solid transparent;
   background: #f8fafc;
   cursor: pointer;
@@ -564,7 +552,7 @@ onMounted(fetchDiaries);
 }
 .emotion-card:hover {
   background: var(--emo-accent-bg, #f1f5f9);
-  transform: translateY(-2px);
+  transform: translateY(-3px);
 }
 .emotion-card:focus-visible {
   outline: 2px solid #0ea5e9;
@@ -574,18 +562,26 @@ onMounted(fetchDiaries);
 .emotion-card--active {
   border-color: var(--emo-accent, #0ea5e9);
   background: var(--emo-accent-bg, rgba(14,165,233,0.1));
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 0 0 4px var(--emo-accent-bg, rgba(14,165,233,0.15));
+  transform: scale(1.05);
 }
 
 .emotion-card-emoji {
-  font-size: 28px;
+  font-size: 36px;
   line-height: 1;
+  transition: transform 0.2s;
+}
+.emotion-card--active .emotion-card-emoji {
+  transform: scale(1.15);
 }
 
 .emotion-card-label {
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 600;
   color: #475569;
+}
+.emotion-card--active .emotion-card-label {
+  color: var(--emo-accent, #0ea5e9);
 }
 
 /* ===== 底部按钮 ===== */
