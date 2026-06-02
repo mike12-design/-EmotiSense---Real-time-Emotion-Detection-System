@@ -79,67 +79,71 @@
             aria-modal="true"
             :aria-label="dialogTitle"
           >
-            <!-- 装饰顶边 -->
-            <div class="dialog-accent-bar"></div>
-
             <!-- 头部 -->
             <div class="dialog-header">
-              <div class="dialog-header-row">
-                <h2 class="dialog-title">{{ dialogTitle }}</h2>
-                <button class="dialog-close" @click="showDialog = false" aria-label="关闭">
-                  <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-                    <path d="M4 4l10 10M14 4L4 14" />
-                  </svg>
-                </button>
+              <div class="dialog-header-icon">
+                <span class="text-2xl">{{ mode === 'create' ? '✍️' : mode === 'patch' ? '📅' : '✏️' }}</span>
               </div>
-              <p class="dialog-subtitle">
-                {{ mode === 'create' ? '记录此刻的心情，留给未来的自己' : mode === 'patch' ? '补写一段遗漏的时光' : '重新审视那一瞬间' }}
-              </p>
+              <div class="dialog-header-text">
+                <h2 class="dialog-title">{{ dialogTitle }}</h2>
+                <p class="dialog-subtitle">
+                  {{ mode === 'create' ? '记录此刻的心情' : mode === 'patch' ? '补写过去的心情' : '修改你的记录' }}
+                </p>
+              </div>
+              <button class="dialog-close" @click="showDialog = false" aria-label="关闭">
+                <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M5 5l10 10M15 5L5 15" />
+                </svg>
+              </button>
             </div>
 
             <!-- 内容区 -->
             <div class="dialog-body">
-              <!-- 心情选择（提到最前 — 先定调再写） -->
-              <div class="emotion-strip">
-                <label class="field-label">此刻心情</label>
-                <div class="emotion-row" role="radiogroup" aria-label="选择心情">
+              <!-- 内容（优先） -->
+              <div class="field-group">
+                <div class="textarea-wrapper">
+                  <textarea
+                    ref="contentRef"
+                    v-model="form.content"
+                    class="field-textarea"
+                    :rows="10"
+                    placeholder="写下你现在的感受..."
+                    maxlength="500"
+                    @input="contentLength = form.content.length"
+                  ></textarea>
+                  <span class="textarea-counter">{{ contentLength }}/500</span>
+                </div>
+              </div>
+
+              <!-- 心情状态 -->
+              <div class="field-group">
+                <label class="field-label">心情状态</label>
+                <div class="emotion-grid" role="radiogroup" :aria-label="'选择心情'">
                   <button
                     v-for="emo in emotions"
                     :key="emo.value"
-                    class="emotion-chip"
-                    :class="{ 'emotion-chip--active': form.emotion === emo.value }"
-                    :style="{ '--chip-color': emo.color, '--chip-bg': emo.bg }"
+                    class="emotion-card"
+                    :class="{ 'emotion-card--active': form.emotion === emo.value }"
+                    :style="{ '--emo-accent': emo.color, '--emo-accent-bg': emo.bg }"
                     role="radio"
                     :aria-checked="form.emotion === emo.value"
                     :aria-label="emo.label"
                     @click="form.emotion = emo.value"
                   >
-                    {{ emo.emoji }} {{ emo.label }}
+                    <span class="emotion-card-emoji">{{ emo.emoji }}</span>
+                    <span class="emotion-card-label">{{ emo.label }}</span>
                   </button>
                 </div>
               </div>
 
-              <!-- 内容区 -->
-              <div class="textarea-wrapper">
-                <textarea
-                  ref="contentRef"
-                  v-model="form.content"
-                  class="field-textarea"
-                  :rows="10"
-                  :placeholder="form.emotion === 'Happy' ? '今天发生了什么开心的事？☀️' : form.emotion === 'Sad' ? '没关系，把不开心写下来会好很多...🍃' : form.emotion === 'Angry' ? '深呼吸，把情绪倒进文字里...🌊' : '写下你现在的感受...✨'"
-                  maxlength="500"
-                  @input="contentLength = form.content.length"
-                ></textarea>
-                <span class="textarea-counter">{{ contentLength }}<span class="counter-max">/500</span></span>
-              </div>
-
               <!-- 时间（仅补卡/编辑时显示） -->
-              <div v-if="mode !== 'create'" class="time-row">
-                <svg class="time-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              <div v-if="mode !== 'create'" class="field-group">
+                <label class="field-label">记录时间</label>
                 <el-date-picker
                   v-model="form.timestamp"
                   type="datetime"
-                  placeholder="选择记录时间"
+                  placeholder="选择时间"
+                  style="width: 100%"
                   class="field-datepicker"
                 />
               </div>
@@ -150,14 +154,13 @@
               <button class="btn-cancel" @click="showDialog = false">取消</button>
               <button
                 class="btn-submit"
-                :disabled="submitting || !form.content.trim()"
+                :disabled="submitting"
                 @click="submitDiary"
               >
                 <svg v-if="submitting" class="btn-spinner" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
                   <path d="M12 2a10 10 0 109.95 11" />
                 </svg>
-                <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
-                {{ submitting ? '保存中...' : '保存日记' }}
+                {{ submitting ? '保存中...' : '保存' }}
               </button>
             </div>
           </div>
@@ -186,10 +189,10 @@ const searchDate = ref(null);
 const contentLength = ref(0);
 
 const emotions = [
-  { value: 'Happy',   label: '开心', emoji: '😊', color: '#F59E0B', bg: 'rgba(245,158,11,0.1)' },
-  { value: 'Neutral', label: '平静', emoji: '😐', color: '#78716C', bg: 'rgba(120,113,108,0.08)' },
-  { value: 'Sad',     label: '难过', emoji: '😢', color: '#6366F1', bg: 'rgba(99,102,241,0.1)' },
-  { value: 'Angry',   label: '生气', emoji: '😡', color: '#EF4444', bg: 'rgba(239,68,68,0.1)' },
+  { value: 'Happy',   label: '开心', emoji: '😊', color: '#34d399', bg: 'rgba(52,211,153,0.12)' },
+  { value: 'Neutral', label: '平静', emoji: '😐', color: '#7dd3fc', bg: 'rgba(125,211,252,0.12)' },
+  { value: 'Sad',     label: '难过', emoji: '😢', color: '#60a5fa', bg: 'rgba(96,165,250,0.12)' },
+  { value: 'Angry',   label: '生气', emoji: '😡', color: '#f87171', bg: 'rgba(248,113,113,0.12)' },
 ];
 
 // 表单相关
@@ -365,238 +368,220 @@ onMounted(fetchDiaries);
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(69, 39, 16, 0.45);
-  backdrop-filter: blur(6px);
+  background: rgba(15, 23, 42, 0.5);
+  backdrop-filter: blur(4px);
 }
 
 /* ===== 弹窗面板 ===== */
 .dialog-panel {
   width: 100%;
-  max-width: 520px;
+  max-width: 560px;
   margin: 24px;
-  max-height: 92vh;
+  max-height: 90vh;
   overflow-y: auto;
-  background: #FFFCF7;
-  border-radius: 24px;
+  background: #fff;
+  border-radius: 20px;
   box-shadow:
-    0 4px 0 0 rgba(146, 64, 14, 0.06),
-    0 0 0 1px rgba(146, 64, 14, 0.08),
-    0 25px 60px -12px rgba(69, 39, 16, 0.25);
-}
-
-/* ===== 装饰顶边 ===== */
-.dialog-accent-bar {
-  height: 4px;
-  background: linear-gradient(90deg, #92400E, #D97706, #6366F1, #8B5CF6);
-  border-radius: 24px 24px 0 0;
+    0 25px 50px -12px rgba(0, 0, 0, 0.25),
+    0 0 0 1px rgba(14, 165, 233, 0.08);
 }
 
 /* ===== 头部 ===== */
 .dialog-header {
-  padding: 24px 28px 0;
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 24px 24px 0;
 }
 
-.dialog-header-row {
+.dialog-header-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #e0f2fe, #bae6fd);
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.dialog-header-text {
+  flex: 1;
+  min-width: 0;
 }
 
 .dialog-title {
   margin: 0;
-  font-family: 'Caveat', 'Ma Shan Zheng', cursive;
-  font-size: 32px;
-  font-weight: 600;
-  color: #451A03;
-  letter-spacing: 0.02em;
-  line-height: 1.2;
+  font-size: 18px;
+  font-weight: 700;
+  color: #0f172a;
+  line-height: 1.3;
 }
 
 .dialog-subtitle {
-  margin: 6px 0 0;
-  font-family: 'Quicksand', sans-serif;
+  margin: 4px 0 0;
   font-size: 13px;
-  font-weight: 500;
-  color: #A16207;
-  letter-spacing: 0.01em;
+  color: #94a3b8;
 }
 
 .dialog-close {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
   border: none;
-  background: rgba(146, 64, 14, 0.06);
-  color: #78716C;
+  background: #f1f5f9;
+  color: #64748b;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  transition: all 0.2s;
+  transition: all 0.15s;
 }
 .dialog-close:hover {
-  background: rgba(146, 64, 14, 0.12);
-  color: #451A03;
-  transform: rotate(90deg);
+  background: #e2e8f0;
+  color: #0f172a;
 }
 .dialog-close:focus-visible {
-  outline: 2px solid #6366F1;
+  outline: 2px solid #0ea5e9;
   outline-offset: 2px;
 }
 
 /* ===== 内容区 ===== */
 .dialog-body {
-  padding: 24px 28px 8px;
+  padding: 24px 28px;
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 22px;
 }
 
-.field-label {
-  display: block;
-  font-family: 'Quicksand', sans-serif;
-  font-size: 12px;
-  font-weight: 700;
-  color: #78716C;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  margin-bottom: 10px;
-}
-
-/* ===== 心情芯片组 ===== */
-.emotion-strip {
-  /* nothing extra needed */
-}
-
-.emotion-row {
+.field-group {
   display: flex;
+  flex-direction: column;
   gap: 8px;
 }
 
-.emotion-chip {
-  flex: 1;
+.field-label {
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 4px;
-  padding: 10px 6px;
-  border-radius: 40px;
-  border: 1.5px solid #E7D7CC;
-  background: #FFFCF7;
-  font-family: 'Quicksand', sans-serif;
+  gap: 6px;
   font-size: 13px;
   font-weight: 600;
-  color: #78716C;
-  cursor: pointer;
-  transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
-  user-select: none;
-}
-.emotion-chip:hover {
-  border-color: var(--chip-color, #6366F1);
-  color: var(--chip-color, #6366F1);
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px var(--chip-bg, rgba(99,102,241,0.15));
-}
-.emotion-chip:focus-visible {
-  outline: 2px solid #6366F1;
-  outline-offset: 2px;
+  color: #475569;
 }
 
-.emotion-chip--active {
-  background: var(--chip-bg, rgba(99,102,241,0.1));
-  border-color: var(--chip-color, #6366F1);
-  color: var(--chip-color, #6366F1);
-  box-shadow:
-    0 0 0 3px var(--chip-bg, rgba(99,102,241,0.12)),
-    0 2px 8px rgba(0,0,0,0.06);
+.field-label-icon {
+  color: #94a3b8;
+  flex-shrink: 0;
 }
 
-/* ===== 文本域 ===== */
+.field-hint {
+  font-size: 12px;
+  color: #94a3b8;
+  margin-top: 2px;
+}
+
+/* 日期选择器 */
+.field-datepicker :deep(.el-input__wrapper) {
+  border-radius: 10px;
+  box-shadow: 0 0 0 1px #e2e8f0;
+  transition: box-shadow 0.15s;
+}
+.field-datepicker :deep(.el-input__wrapper:hover) {
+  box-shadow: 0 0 0 1px #cbd5e1;
+}
+
+/* 文本域 */
 .textarea-wrapper {
   position: relative;
 }
 
 .field-textarea {
   width: 100%;
-  min-height: 240px;
-  padding: 20px 22px;
-  font-family: 'Quicksand', sans-serif;
+  min-height: 260px;
+  padding: 18px 20px;
   font-size: 15px;
-  font-weight: 500;
-  line-height: 1.85;
-  color: #451A03;
-  background: #FFFBF3;
-  border: 1.5px solid #E7D7CC;
-  border-radius: 18px;
+  font-family: inherit;
+  line-height: 1.8;
+  color: #1e293b;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
   resize: none;
-  outline: none;
-  transition: border-color 0.25s, box-shadow 0.25s, background 0.25s;
+  transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
   box-sizing: border-box;
 }
 .field-textarea::placeholder {
-  color: #C4B5A5;
-  font-weight: 500;
+  color: #94a3b8;
 }
 .field-textarea:focus {
-  border-color: #6366F1;
-  background: #FFFCF7;
-  box-shadow:
-    0 0 0 4px rgba(99, 102, 241, 0.08),
-    inset 0 1px 3px rgba(99, 102, 241, 0.04);
+  outline: none;
+  border-color: #0ea5e9;
+  box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.15);
+  background: #fff;
 }
 
 .textarea-counter {
   position: absolute;
-  bottom: 14px;
-  right: 16px;
-  font-family: 'Quicksand', sans-serif;
-  font-size: 13px;
-  font-weight: 500;
-  color: #451A03;
+  bottom: 8px;
+  right: 12px;
+  font-size: 11px;
+  color: #94a3b8;
   pointer-events: none;
 }
-.counter-max {
-  color: #C4B5A5;
-  font-weight: 500;
-}
 
-/* ===== 时间行 ===== */
-.time-row {
-  display: flex;
-  align-items: center;
+/* ===== 情绪卡片 ===== */
+.emotion-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
   gap: 10px;
-  padding: 12px 16px;
-  background: #FFFBF3;
-  border: 1.5px dashed #E7D7CC;
-  border-radius: 14px;
 }
 
-.time-icon {
-  color: #A16207;
-  flex-shrink: 0;
+.emotion-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 18px 8px 14px;
+  border-radius: 16px;
+  border: 2px solid transparent;
+  background: #f8fafc;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  font-family: inherit;
+}
+.emotion-card:hover {
+  background: var(--emo-accent-bg, #f1f5f9);
+  transform: translateY(-3px);
+}
+.emotion-card:focus-visible {
+  outline: 2px solid #0ea5e9;
+  outline-offset: 2px;
 }
 
-.field-datepicker {
-  flex: 1;
+.emotion-card--active {
+  border-color: var(--emo-accent, #0ea5e9);
+  background: var(--emo-accent-bg, rgba(14,165,233,0.1));
+  box-shadow: 0 0 0 4px var(--emo-accent-bg, rgba(14,165,233,0.15));
+  transform: scale(1.05);
 }
-.field-datepicker :deep(.el-input__wrapper) {
-  border-radius: 10px;
-  background: transparent;
-  box-shadow: none;
-  border: none;
-  padding: 0 8px;
+
+.emotion-card-emoji {
+  font-size: 36px;
+  line-height: 1;
+  transition: transform 0.2s;
 }
-.field-datepicker :deep(.el-input__wrapper:hover) {
-  box-shadow: none;
+.emotion-card--active .emotion-card-emoji {
+  transform: scale(1.15);
 }
-.field-datepicker :deep(.el-input__inner) {
-  font-family: 'Quicksand', sans-serif;
+
+.emotion-card-label {
   font-size: 13px;
-  color: #451A03;
+  font-weight: 600;
+  color: #475569;
 }
-.field-datepicker :deep(.el-input__inner::placeholder) {
-  color: #C4B5A5;
+.emotion-card--active .emotion-card-label {
+  color: var(--emo-accent, #0ea5e9);
 }
 
 /* ===== 底部按钮 ===== */
@@ -604,62 +589,57 @@ onMounted(fetchDiaries);
   display: flex;
   justify-content: flex-end;
   gap: 10px;
-  padding: 20px 28px 28px;
+  padding: 0 24px 24px;
 }
 
 .btn-cancel {
-  padding: 12px 22px;
-  border-radius: 40px;
-  border: 1.5px solid #E7D7CC;
-  background: transparent;
-  color: #78716C;
-  font-family: 'Quicksand', sans-serif;
+  padding: 10px 20px;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  color: #475569;
   font-size: 14px;
-  font-weight: 600;
+  font-weight: 500;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.15s;
+  font-family: inherit;
 }
 .btn-cancel:hover {
-  background: rgba(146, 64, 14, 0.04);
-  border-color: #D4C4B0;
-  color: #451A03;
+  background: #f1f5f9;
+  border-color: #cbd5e1;
 }
 .btn-cancel:focus-visible {
-  outline: 2px solid #6366F1;
+  outline: 2px solid #0ea5e9;
   outline-offset: 2px;
 }
 
 .btn-submit {
   display: inline-flex;
   align-items: center;
-  gap: 7px;
-  padding: 12px 28px;
-  border-radius: 40px;
+  gap: 6px;
+  padding: 10px 24px;
+  border-radius: 12px;
   border: none;
-  background: linear-gradient(135deg, #6366F1 0%, #4F46E5 100%);
+  background: linear-gradient(135deg, #0ea5e9, #0284c7);
   color: #fff;
-  font-family: 'Quicksand', sans-serif;
   font-size: 14px;
-  font-weight: 700;
+  font-weight: 600;
   cursor: pointer;
-  transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
-  box-shadow: 0 4px 16px rgba(99, 102, 241, 0.3);
+  transition: all 0.2s;
+  font-family: inherit;
+  box-shadow: 0 4px 12px rgba(14, 165, 233, 0.3);
 }
-.btn-submit:hover:not(:disabled) {
-  box-shadow: 0 8px 28px rgba(99, 102, 241, 0.4);
-  transform: translateY(-2px);
-}
-.btn-submit:active:not(:disabled) {
-  transform: scale(0.96);
+.btn-submit:hover {
+  box-shadow: 0 6px 20px rgba(14, 165, 233, 0.4);
+  transform: translateY(-1px);
 }
 .btn-submit:disabled {
-  opacity: 0.4;
+  opacity: 0.6;
   cursor: not-allowed;
   transform: none;
-  box-shadow: none;
 }
 .btn-submit:focus-visible {
-  outline: 2px solid #6366F1;
+  outline: 2px solid #0ea5e9;
   outline-offset: 2px;
 }
 
@@ -673,17 +653,17 @@ onMounted(fetchDiaries);
 
 /* ===== 过渡动画 ===== */
 .dialog-enter-active {
-  transition: all 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
 .dialog-leave-active {
-  transition: all 0.2s ease-in;
+  transition: all 0.15s ease-in;
 }
 
 .dialog-enter-from {
   opacity: 0;
 }
 .dialog-enter-from .dialog-panel {
-  transform: scale(0.92) translateY(24px);
+  transform: scale(0.95) translateY(10px);
   opacity: 0;
 }
 
@@ -691,22 +671,8 @@ onMounted(fetchDiaries);
   opacity: 0;
 }
 .dialog-leave-to .dialog-panel {
-  transform: scale(0.95) translateY(8px);
+  transform: scale(0.95) translateY(10px);
   opacity: 0;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .dialog-enter-active,
-  .dialog-leave-active {
-    transition: opacity 0.15s;
-  }
-  .dialog-enter-from .dialog-panel,
-  .dialog-leave-to .dialog-panel {
-    transform: none;
-  }
-  .dialog-close:hover {
-    transform: none;
-  }
 }
 
 /* ===== Flex 工具类 ===== */
