@@ -95,10 +95,10 @@ const scoreColors = [
 
 // 初始化图表
 const initChart = (data) => {
-  if (!myChart) {
-    myChart = echarts.init(trendChartRef.value);
-  }
-  
+  if (!trendChartRef.value) return;
+  if (myChart) myChart.dispose();
+  myChart = echarts.init(trendChartRef.value);
+
   const option = {
     // 1. 颜色线性渐变映射 (红 -> 黄 -> 绿)
     visualMap: {
@@ -189,6 +189,7 @@ const fetchChartData = async () => {
   } catch (e) {
     console.error("图表数据获取失败", e);
     chartEmpty.value = true;
+    if (myChart) { myChart.dispose(); myChart = null; }
   } finally {
     chartLoading.value = false;
   }
